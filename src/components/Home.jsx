@@ -1,18 +1,98 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
+import GlobeView from './GlobeView';
+import RightSidebar from './RightSidebar';
+import DraggablePlayer from './DraggablePlayer';
+import COUNTRIES from '../data/countries';
+import { Link } from 'react-router-dom';
+import { Home as HomeIcon, Tv, User, Settings, Sun, Moon } from 'lucide-react';
+import { useTheme } from '../context/ThemeContext';
 
 const Home = () => {
+  const [selectedCountry, setSelectedCountry] = useState(null);
+  const [selectedChannel, setSelectedChannel] = useState(null);
+  const globeRef = useRef(null);
+  const { isDarkMode, setIsDarkMode } = useTheme();
+
+  const toggleDarkMode = () => setIsDarkMode(s => !s);
+
+  const handleCountrySelected = (country) => {
+    setSelectedCountry(country);
+  };
+
+  const handleSelectChannel = (channel) => {
+    setSelectedChannel(channel);
+  };
+
+  // Reset globe and clear selected country/channel
+  const handleResetGlobe = () => {
+    setSelectedCountry(null);
+    setSelectedChannel(null);
+    try {
+      if (globeRef.current && typeof globeRef.current.pointOfView === 'function') {
+        globeRef.current.pointOfView({ lat: 0, lng: 0, altitude: 2 }, 1000);
+      }
+    } catch (err) {
+      console.error('Failed to reset globe', err);
+    }
+  };
+
   return (
-    <div>
-      <h2 className="text-3xl font-semibold mb-6">Welcome back!</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {[1, 2, 3, 4, 5, 6].map((item) => (
-          <div key={item} className="bg-gray-800 p-4 rounded-lg shadow-lg hover:scale-105 transition-transform duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500" tabIndex={0}>
-            <div className="h-40 bg-gray-700 rounded mb-4"></div>
-            <div className="h-6 bg-gray-700 rounded w-3/4 mb-2"></div>
-            <div className="h-4 bg-gray-700 rounded w-1/2"></div>
+    <div className="w-screen h-screen overflow-hidden bg-black font-sans">
+      {/* Top Header Bar */}
+      <header className="fixed h-14 bg-[#141414] w-full flex items-center justify-between px-6 z-50 border-b border-[#2a2a2a]">
+        <div className="flex items-center gap-4">
+          <div className="text-xl font-semibold text-blue-400">Cortex TV</div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <nav className="hidden md:flex items-center gap-4 text-sm text-gray-200">
+            <Link to="/" className="hover:text-white">Home</Link>
+            <Link to="/shows" className="hover:text-white">Shows</Link>
+            <Link to="/profile" className="hover:text-white">Profile</Link>
+            <Link to="/settings" className="hover:text-white">Settings</Link>
+          </nav>
+
+          {/* Action Buttons Wrapper */}
+          <div className="flex items-center gap-3 p-3 bg-[#141414] border-b border-white/5">
+            <button 
+              onClick={handleResetGlobe} 
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/15 text-sm font-medium text-gray-200 transition-all active:scale-95 border border-white/5 shadow-sm"
+            >
+              <span>↺</span> Reset Globe
+            </button>
+            
+            <button 
+              onClick={toggleDarkMode} 
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 hover:bg-white/15 text-sm font-medium text-gray-200 transition-all active:scale-95 border border-white/5 shadow-sm"
+            >
+              <span>☼</span> Dark Mode
+            </button>
           </div>
-        ))}
-      </div>
+        </div>
+      </header>
+
+      {/* Main content: globe + right sidebar */}
+      <main className="pt-14 w-full h-[calc(100vh-56px)] grid" style={{ gridTemplateColumns: 'minmax(0, 1fr) 350px' }}>
+        <div className="h-full w-full relative">
+          {selectedChannel ? (
+            <div className="flex-1 relative bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-gray-800 via-black to-black">
+              <DraggablePlayer channel={selectedChannel} onClose={() => setSelectedChannel(null)} />
+            </div>
+          ) : (
+            <GlobeView ref={globeRef} countries={COUNTRIES} onCountryClick={handleCountrySelected} />
+          )}
+        </div>
+
+        <div className="h-full">
+          <RightSidebar
+            selectedCountry={selectedCountry}
+            onCountrySelect={handleCountrySelected}
+            onSelectChannel={handleSelectChannel}
+          />
+        </div>
+      </main>
+
+      {/* PlayerModal removed: center area now shows VideoPlayer when a channel is selected */}
     </div>
   );
 };
