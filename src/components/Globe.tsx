@@ -31,9 +31,18 @@ export interface GlobeClickInfo {
 interface GlobeProps {
   onCountryClick?: (info: GlobeClickInfo) => void;
   isNightMode?: boolean;
+  rotationSpeed?: number;
+  atmosphereIntensity?: number;
+  focusCountryIso?: string | null;
 }
 
-export default function Globe({ onCountryClick, isNightMode = false }: GlobeProps) {
+export default function Globe({
+  onCountryClick,
+  isNightMode = false,
+  rotationSpeed = 0.4,
+  atmosphereIntensity = 0.25,
+  focusCountryIso,
+}: GlobeProps) {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [countries, setCountries] = useState<any[]>([]);
@@ -80,7 +89,7 @@ export default function Globe({ onCountryClick, isNightMode = false }: GlobeProp
 
     const controls = globe.controls();
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.4;
+    controls.autoRotateSpeed = rotationSpeed;
     controls.enablePan = false;
     controls.minDistance = 150;
     controls.maxDistance = 500;
@@ -89,13 +98,66 @@ export default function Globe({ onCountryClick, isNightMode = false }: GlobeProp
     globe.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0);
   }, []);
 
+  /* ── Update rotation speed dynamically ── */
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    const controls = globe.controls();
+    controls.autoRotateSpeed = rotationSpeed;
+  }, [rotationSpeed]);
+
+  /* ── Fly to country when focusCountryIso changes ── */
+  useEffect(() => {
+    if (!focusCountryIso || !globeRef.current || countries.length === 0) return;
+    const iso = focusCountryIso.toUpperCase();
+    const feature = countries.find((f: any) => {
+      const p = f.properties ?? {};
+      return (
+        (p.ISO_A2 ?? "").toUpperCase() === iso ||
+        (p.ISO_A3 ?? "").toUpperCase() === iso ||
+        (p.ADM0_A3 ?? "").toUpperCase() === iso
+      );
+    });
+    if (!feature) return;
+
+    /* Compute centroid from the geometry coordinates */
+    const coords = feature.geometry?.coordinates;
+    if (!coords) return;
+    let lats = 0, lngs = 0, count = 0;
+    const flatten = (arr: any) => {
+      if (typeof arr[0] === "number") {
+        lngs += arr[0];
+        lats += arr[1];
+        count++;
+      } else {
+        for (const sub of arr) flatten(sub);
+      }
+    };
+    flatten(coords);
+    if (count === 0) return;
+
+    globeRef.current.pointOfView(
+      { lat: lats / count, lng: lngs / count, altitude: 1.8 },
+      1200
+    );
+  }, [focusCountryIso, countries]);
+
   /* ── Country click handler ── */
   const handlePolygonClick = useCallback(
     (polygon: any) => {
       if (!polygon) return;
       const props = polygon.properties ?? {};
       const name = props.ADMIN || props.NAME || "Unknown";
-      const iso = props.ISO_A2 || props.ISO_A3 || "";
+
+      /* Natural Earth uses "-99" for countries with disputes
+         (France, Norway, N. Cyprus, Somaliland, Kosovo…)
+         BOTH ISO_A2 *and* ISO_A3 can be "-99".
+         Fallback chain: ISO_A2 → ISO_A3 → ADM0_A3 → "" */
+      const clean = (v: string | undefined) => {
+        const s = (v ?? "").trim();
+        return s === "-99" || s === "" ? "" : s;
+      };
+      const iso = clean(props.ISO_A2) || clean(props.ISO_A3) || clean(props.ADM0_A3) || "";
 
       console.log(
         `%c[Cortex TV] ${name} (${iso})`,
@@ -146,7 +208,7 @@ export default function Globe({ onCountryClick, isNightMode = false }: GlobeProp
         backgroundColor="rgba(0,0,0,0)"
         backgroundImageUrl={isNightMode ? NIGHT_SKY_URL : undefined}
         atmosphereColor={isNightMode ? "#0066cc" : "#00bfff"}
-        atmosphereAltitude={0.25}
+        atmosphereAltitude={atmosphereIntensity}
         animateIn={true}
         /* ── Country polygons ── */
         polygonsData={countries}

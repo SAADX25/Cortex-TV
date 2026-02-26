@@ -65,9 +65,20 @@ function ToolButton({ icon, label, onClick }: ToolButtonProps) {
 interface LeftSidebarProps {
   isNightMode: boolean;
   onToggleNightMode: () => void;
+  showFavorites: boolean;
+  onToggleFavorites: () => void;
+  onOpenSearch: () => void;
+  onOpenSettings: () => void;
 }
 
-export default function LeftSidebar({ isNightMode, onToggleNightMode }: LeftSidebarProps) {
+export default function LeftSidebar({
+  isNightMode,
+  onToggleNightMode,
+  showFavorites,
+  onToggleFavorites,
+  onOpenSearch,
+  onOpenSettings,
+}: LeftSidebarProps) {
   return (
     <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-4 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 p-3 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
       {/* Day / Night toggle */}
@@ -98,14 +109,26 @@ export default function LeftSidebar({ isNightMode, onToggleNightMode }: LeftSide
       {/* Divider */}
       <div className="w-5 border-t border-white/10" />
 
-      <ToolButton icon={<SearchIcon />} label="Search" />
-      <ToolButton icon={<StarIcon />} label="Favorites" />
+      <ToolButton icon={<SearchIcon />} label="Search" onClick={onOpenSearch} />
+      <ToolButton
+        icon={
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+            fill={showFavorites ? "currentColor" : "none"}
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            className={showFavorites ? "text-cyan-400" : ""}
+          >
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        }
+        label="Favorites"
+        onClick={onToggleFavorites}
+      />
       <ToolButton icon={<WrenchIcon />} label="Tools" />
 
       {/* Divider */}
       <div className="w-5 border-t border-white/10" />
 
-      <ToolButton icon={<SettingsIcon />} label="Settings" />
+      <ToolButton icon={<SettingsIcon />} label="Settings" onClick={onOpenSettings} />
     </div>
   );
 }

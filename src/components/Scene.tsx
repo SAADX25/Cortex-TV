@@ -9,9 +9,18 @@ import Globe, { type GlobeClickInfo } from "./Globe";
 interface SceneProps {
   onCountryClick?: (info: GlobeClickInfo) => void;
   isNightMode?: boolean;
+  rotationSpeed?: number;
+  atmosphereIntensity?: number;
+  focusCountryIso?: string | null;
 }
 
-export default function Scene({ onCountryClick, isNightMode }: SceneProps) {
+export default function Scene({
+  onCountryClick,
+  isNightMode,
+  rotationSpeed,
+  atmosphereIntensity,
+  focusCountryIso,
+}: SceneProps) {
   const handleGlobeClick = useCallback(
     (info: GlobeClickInfo) => {
       if (info.country) {
@@ -25,5 +34,13 @@ export default function Scene({ onCountryClick, isNightMode }: SceneProps) {
     [onCountryClick]
   );
 
-  return <Globe onCountryClick={handleGlobeClick} isNightMode={isNightMode} />;
+  return (
+    <Globe
+      onCountryClick={handleGlobeClick}
+      isNightMode={isNightMode}
+      rotationSpeed={rotationSpeed}
+      atmosphereIntensity={atmosphereIntensity}
+      focusCountryIso={focusCountryIso}
+    />
+  );
 }

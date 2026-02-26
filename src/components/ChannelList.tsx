@@ -1,16 +1,21 @@
 /* ──────────────────────────────────────────────────
-   ChannelList.tsx – Slide-in sidebar listing IPTV
-   channels for the selected country.
+   ChannelList.tsx – Virtualised sidebar listing IPTV
+   channels. Uses react-virtuoso so only visible rows
+   are mounted – slashing DOM nodes & RAM usage.
    ────────────────────────────────────────────────── */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "../hooks/useIPTV";
 
-/** Build a flag CDN URL from a lowercase ISO 3166-1 alpha-2 code */
-const flagUrl = (iso: string) =>
-  `https://flagcdn.com/w40/${iso.toLowerCase()}.png`;
+/** Flag CDN URL from ISO alpha-2 code */
+const FLAG_CODE_MAP: Record<string, string> = { uk: "gb" };
+const flagUrl = (iso: string) => {
+  const code = iso.toLowerCase();
+  return `https://flagcdn.com/w40/${FLAG_CODE_MAP[code] ?? code}.png`;
+};
 
-/** Fallback TV icon shown when no flag/logo is available */
+/** Fallback TV icon */
 function FallbackIcon() {
   return (
     <svg
@@ -32,18 +37,203 @@ function FallbackIcon() {
 }
 
 interface ChannelListProps {
-  /** Country display name shown in the header */
   countryName: string;
-  /** Filtered channel list */
   channels: ChannelWithStream[];
-  /** Whether the data is still loading */
   loading: boolean;
-  /** Error message, if any */
   error: string | null;
-  /** Called when a playable channel is selected */
   onPlayChannel?: (channel: ChannelWithStream) => void;
-  /** Close the sidebar */
   onClose: () => void;
+  favorites: ChannelWithStream[];
+  onToggleFavorite: (channel: ChannelWithStream) => void;
+}
+
+/* ── Memoised row component ── */
+function ChannelRow({
+  ch,
+  isFav,
+  onPlay,
+  onToggleFav,
+}: {
+  ch: ChannelWithStream;
+  isFav: boolean;
+  onPlay: () => void;
+  onToggleFav: () => void;
+}) {
+  const [pingStatus, setPingStatus] = useState<
+    "idle" | "checking" | "online" | "offline"
+  >("idle");
+
+  /* ── Auto-ping on mount (safe with virtuoso — only visible rows mount) ── */
+  useEffect(() => {
+    if (!ch.streamUrl) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    setPingStatus("checking");
+
+    (async () => {
+      try {
+        timer = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(ch.streamUrl!, {
+          method: "GET",
+          mode: "no-cors",
+          signal: controller.signal,
+        });
+        if (timer) clearTimeout(timer);
+        if (!controller.signal.aborted) {
+          setPingStatus(res.status < 400 || res.type === "opaque" ? "online" : "offline");
+        }
+      } catch {
+        if (!controller.signal.aborted) {
+          setPingStatus("offline");
+        }
+      }
+    })();
+
+    return () => {
+      controller.abort();
+      if (timer) clearTimeout(timer);
+    };
+  }, [ch.streamUrl]);
+
+  /* Ping icon styles per status */
+  const pingStyles: Record<typeof pingStatus, string> = {
+    idle: "text-white/15",
+    checking: "text-yellow-400 animate-pulse",
+    online: "text-emerald-400 drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]",
+    offline: "text-red-400 drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]",
+  };
+
+  return (
+    <button
+      onClick={() => ch.streamUrl && onPlay()}
+      disabled={!ch.streamUrl}
+      className={`pointer-events-auto w-full flex items-center gap-3 rounded-lg px-3 py-2.5 mb-1 text-left transition-colors ${
+        ch.streamUrl
+          ? "hover:bg-cyan-500/10 cursor-pointer"
+          : "opacity-40 cursor-not-allowed"
+      }`}
+    >
+      {/* Flag / Logo */}
+      <div className="shrink-0 h-10 w-10 rounded-sm bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+        {ch.country ? (
+          <img
+            src={flagUrl(ch.country)}
+            alt={ch.country}
+            width={32}
+            className="rounded-sm object-cover"
+            loading="lazy"
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              if (ch.logo && img.src !== ch.logo) {
+                img.src = ch.logo;
+              } else {
+                img.style.display = "none";
+                img.parentElement
+                  ?.querySelector(".fallback-icon")
+                  ?.classList.remove("hidden");
+              }
+            }}
+          />
+        ) : ch.logo ? (
+          <img
+            src={ch.logo}
+            alt=""
+            className="h-full w-full object-contain"
+            loading="lazy"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+              (e.target as HTMLImageElement)
+                .parentElement?.querySelector(".fallback-icon")
+                ?.classList.remove("hidden");
+            }}
+          />
+        ) : null}
+        <span
+          className={`fallback-icon ${
+            ch.country || ch.logo ? "hidden" : ""
+          }`}
+        >
+          <FallbackIcon />
+        </span>
+      </div>
+
+      {/* Info */}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-white truncate">{ch.name}</p>
+        <div className="flex items-center gap-2 mt-0.5">
+          {ch.categories.length > 0 && (
+            <span className="text-[10px] text-cyan-400/60 uppercase tracking-wider truncate">
+              {ch.categories.slice(0, 2).join(" · ")}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Stream ping status indicator */}
+      {ch.streamUrl && (
+        <span
+          className={`shrink-0 p-1 transition-all ${pingStyles[pingStatus]}`}
+          title={
+            pingStatus === "idle"
+              ? "Waiting…"
+              : pingStatus === "checking"
+                ? "Checking…"
+                : pingStatus === "online"
+                  ? "Stream is online"
+                  : "Stream is offline"
+          }
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            {/* Activity / signal icon */}
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+        </span>
+      )}
+
+      {/* Favorite star */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFav();
+        }}
+        className="shrink-0 p-1 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+        title={isFav ? "Remove from favorites" : "Add to favorites"}
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill={isFav ? "#22d3ee" : "none"}
+          stroke={isFav ? "#22d3ee" : "currentColor"}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={isFav ? "text-cyan-400" : "text-white/30"}
+        >
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+        </svg>
+      </button>
+
+      {/* Stream indicator */}
+      {ch.streamUrl ? (
+        <div className="shrink-0 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
+      ) : (
+        <span className="shrink-0 text-[10px] text-white/20">offline</span>
+      )}
+    </button>
+  );
 }
 
 export default function ChannelList({
@@ -53,18 +243,49 @@ export default function ChannelList({
   error,
   onPlayChannel,
   onClose,
+  favorites,
+  onToggleFavorite,
 }: ChannelListProps) {
   const [search, setSearch] = useState("");
 
-  const filtered = search
-    ? channels.filter(
-        (ch) =>
-          ch.name.toLowerCase().includes(search.toLowerCase()) ||
-          ch.categories.some((c) =>
-            c.toLowerCase().includes(search.toLowerCase())
+  /* Build a Set for O(1) favourite lookup instead of .some() per row */
+  const favSet = useMemo(
+    () => new Set(favorites.map((f) => f.id)),
+    [favorites]
+  );
+
+  const filtered = useMemo(
+    () =>
+      search
+        ? channels.filter(
+            (ch) =>
+              ch.name.toLowerCase().includes(search.toLowerCase()) ||
+              ch.categories.some((c) =>
+                c.toLowerCase().includes(search.toLowerCase())
+              )
           )
-      )
-    : channels;
+        : channels,
+    [channels, search]
+  );
+
+  /* Row renderer for Virtuoso */
+  const renderRow = useCallback(
+    (index: number) => {
+      const ch = filtered[index];
+      return (
+        <ChannelRow
+          ch={ch}
+          isFav={favSet.has(ch.id)}
+          onPlay={() => onPlayChannel?.(ch)}
+          onToggleFav={() => onToggleFavorite(ch)}
+        />
+      );
+    },
+    [filtered, favSet, onPlayChannel, onToggleFavorite]
+  );
+
+  /* Empty / loading / error states shown inside the Virtuoso area */
+  const showVirtualList = !loading && !error && filtered.length > 0;
 
   return (
     <div className="absolute inset-y-0 right-0 w-[420px] max-w-full z-30 flex flex-col bg-black/80 backdrop-blur-xl border-l border-cyan-500/15 animate-slide-in">
@@ -98,21 +319,19 @@ export default function ChannelList({
         />
       </div>
 
-      {/* ── List ── */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin px-3 py-2">
+      {/* ── Virtualised list ── */}
+      <div className="flex-1 overflow-hidden">
         {loading && (
           <div className="flex items-center justify-center py-20">
             <div className="flex flex-col items-center gap-3">
               <div className="h-8 w-8 rounded-full border-2 border-cyan-400/30 border-t-cyan-400 animate-spin" />
-              <span className="text-sm text-white/40">
-                Loading channels…
-              </span>
+              <span className="text-sm text-white/40">Loading channels…</span>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="mx-2 my-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
+          <div className="mx-5 my-4 rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
             {error}
           </div>
         )}
@@ -128,82 +347,15 @@ export default function ChannelList({
           </div>
         )}
 
-        {!loading &&
-          filtered.map((ch) => (
-            <button
-              key={ch.id}
-              onClick={() => ch.streamUrl && onPlayChannel?.(ch)}
-              disabled={!ch.streamUrl}
-              className={`pointer-events-auto w-full flex items-center gap-3 rounded-lg px-3 py-2.5 mb-1 text-left transition-colors ${
-                ch.streamUrl
-                  ? "hover:bg-cyan-500/10 cursor-pointer"
-                  : "opacity-40 cursor-not-allowed"
-              }`}
-            >
-              {/* Flag / Logo */}
-              <div className="shrink-0 h-10 w-10 rounded-sm bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-                {ch.country ? (
-                  <img
-                    src={flagUrl(ch.country)}
-                    alt={ch.country}
-                    width={32}
-                    className="rounded-sm object-cover"
-                    loading="lazy"
-                    onError={(e) => {
-                      /* Flag failed → try channel logo, else show fallback */
-                      const img = e.target as HTMLImageElement;
-                      if (ch.logo && img.src !== ch.logo) {
-                        img.src = ch.logo;
-                      } else {
-                        img.style.display = "none";
-                        img.parentElement!.querySelector(".fallback-icon")
-                          ?.classList.remove("hidden");
-                      }
-                    }}
-                  />
-                ) : ch.logo ? (
-                  <img
-                    src={ch.logo}
-                    alt=""
-                    className="h-full w-full object-contain"
-                    loading="lazy"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                      (e.target as HTMLImageElement)
-                        .parentElement!.querySelector(".fallback-icon")
-                        ?.classList.remove("hidden");
-                    }}
-                  />
-                ) : null}
-                <span className={`fallback-icon ${ch.country || ch.logo ? "hidden" : ""}`}>
-                  <FallbackIcon />
-                </span>
-              </div>
-
-              {/* Info */}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-white truncate">
-                  {ch.name}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5">
-                  {ch.categories.length > 0 && (
-                    <span className="text-[10px] text-cyan-400/60 uppercase tracking-wider truncate">
-                      {ch.categories.slice(0, 2).join(" · ")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Stream indicator */}
-              {ch.streamUrl ? (
-                <div className="shrink-0 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
-              ) : (
-                <span className="shrink-0 text-[10px] text-white/20">
-                  offline
-                </span>
-              )}
-            </button>
-          ))}
+        {showVirtualList && (
+          <Virtuoso
+            totalCount={filtered.length}
+            itemContent={renderRow}
+            overscan={200}
+            className="scrollbar-thin"
+            style={{ height: "100%", padding: "8px 12px" }}
+          />
+        )}
       </div>
 
       {/* ── Footer stats ── */}

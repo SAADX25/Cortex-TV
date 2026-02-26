@@ -35,6 +35,117 @@ body,
   animation: slide-in-right 0.3s ease-out;
 }
 
+/* ── Search modal animations ── */
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes modal-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.96);
+  }
+}
+.animate-modal-in {
+  animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-modal-out {
+  animation: modal-out 0.2s ease-in forwards;
+}
+
+/* ── Backdrop fade ── */
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes backdrop-out {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+.animate-backdrop-in {
+  animation: backdrop-in 0.2s ease-out;
+}
+.animate-backdrop-out {
+  animation: backdrop-out 0.25s ease-in forwards;
+}
+
+/* ── Settings panel slide-in from left ── */
+@keyframes settings-in {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+@keyframes settings-out {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+}
+.animate-settings-in {
+  animation: settings-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.animate-settings-out {
+  animation: settings-out 0.28s ease-in forwards;
+}
+
+/* ── Settings slider (range input) ── */
+.settings-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+  cursor: pointer;
+}
+.settings-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #22d3ee;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  cursor: pointer;
+  transition: box-shadow 0.2s;
+}
+.settings-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 14px rgba(0, 255, 255, 0.7);
+}
+.settings-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #22d3ee;
+  box-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+  border: none;
+  cursor: pointer;
+}
+.settings-slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
 /* ── Thin scrollbar for channel list ── */
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;

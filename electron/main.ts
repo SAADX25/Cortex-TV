@@ -4,7 +4,7 @@
    server in dev or the built index.html in prod.
    ───────────────────────────────────────────────── */
 
-import { app, BrowserWindow, screen } from "electron";
+import { app, BrowserWindow, screen, session } from "electron";
 import path from "node:path";
 
 // ── Env vars set by vite-plugin-electron ──
@@ -36,6 +36,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webgl: true,
+      webSecurity: false,           // Bypass CORS for .m3u8 / IPTV streams
+      allowRunningInsecureContent: true,
     },
   });
 
@@ -82,8 +84,67 @@ function createWindow() {
   }
 }
 
+// ── Network interceptor: inject User-Agent / Origin / Referer ──
+function setupWebRequestInterceptor() {
+  const SMART_TV_UA =
+    "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/2.2 Chrome/63.0.3239.84 TV Safari/537.36";
+
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ["*://*/*"] },
+    (details, callback) => {
+      const headers = { ...details.requestHeaders };
+
+      // Inject a Smart TV User-Agent for stream requests
+      const url = details.url.toLowerCase();
+      const isStream =
+        url.includes(".m3u8") ||
+        url.includes(".ts") ||
+        url.includes(".m3u") ||
+        url.includes("iptv") ||
+        url.includes("stream") ||
+        url.includes(".mpd") ||
+        url.includes(".uk/") ||          // UK-specific stream hosts
+        url.includes("bbc.co") ||        // BBC streams
+        url.includes("sky.com") ||       // Sky streams
+        url.includes("itv.com");         // ITV streams
+
+      if (isStream) {
+        headers["User-Agent"] = SMART_TV_UA;
+        headers["Origin"] = new URL(details.url).origin;
+        headers["Referer"] = new URL(details.url).origin + "/";
+      }
+
+      callback({ requestHeaders: headers });
+    }
+  );
+
+  // Also strip restrictive CORS headers from responses
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: ["*://*/*"] },
+    (details, callback) => {
+      const headers = { ...details.responseHeaders };
+
+      // Allow all origins for stream resources
+      headers["Access-Control-Allow-Origin"] = ["*"];
+      headers["Access-Control-Allow-Headers"] = ["*"];
+      headers["Access-Control-Allow-Methods"] = ["GET, HEAD, OPTIONS"];
+
+      // Remove X-Frame-Options so embedded players work
+      delete headers["X-Frame-Options"];
+      delete headers["x-frame-options"];
+
+      callback({ responseHeaders: headers });
+    }
+  );
+
+  console.log("[Electron] Web request interceptor installed (CORS bypass + Smart TV UA)");
+}
+
 // ── App lifecycle ──
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  setupWebRequestInterceptor();
+  createWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
