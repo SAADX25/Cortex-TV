@@ -1,45 +1,56 @@
 {
   "name": "cortex-tv",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "main": "electron/main.cjs",
+  "version": "1.0.0",
+  "description": "Cortex TV – 3D Interactive Globe IPTV Player",
+  "main": "dist-electron/main.js",
   "scripts": {
-    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "build": "vite build",
-    "lint": "eslint .",
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build",
     "preview": "vite preview",
-    "electron:serve": "electron .",
-    "build:electron": "vite build"
+    "electron:build": "npm run build && electron-builder",
+    "electron:dev": "vite"
   },
-  "dependencies": {
-    "lucide-react": "^0.575.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "react-draggable": "^4.5.0",
-    "react-globe.gl": "^2.37.0",
-    "react-player": "^2.16.1",
-    "react-router-dom": "^7.13.1",
-    "three": "^0.152.2"
+  "build": {
+    "appId": "com.cortextv.app",
+    "productName": "Cortex TV",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "public/vite.svg"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@tailwindcss/postcss": "^4.2.1",
-    "@types/react": "^19.2.7",
+    "@tailwindcss/vite": "^4.2.1",
+    "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
-    "autoprefixer": "^10.4.24",
-    "concurrently": "^8.2.0",
-    "electron": "^26.0.0",
-    "eslint": "^9.39.1",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.4.24",
-    "globals": "^16.5.0",
-    "postcss": "^8.5.6",
+    "@vitejs/plugin-react": "^5.1.4",
+    "electron": "^40.6.1",
+    "electron-builder": "^26.8.1",
     "tailwindcss": "^4.2.1",
+    "typescript": "~5.9.3",
     "vite": "^7.3.1",
     "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6",
-    "wait-on": "^7.0.1"
+    "vite-plugin-electron-renderer": "^0.14.6"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "hls.js": "^1.6.15",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-globe.gl": "^2.37.0",
+    "react-player": "^3.4.0",
+    "three": "^0.183.1"
   }
 }
