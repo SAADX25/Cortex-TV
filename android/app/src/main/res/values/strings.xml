@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cortex TV</string>
+    <string name="title_activity_main">Cortex TV</string>
+    <string name="package_name">com.SAADX25.cortextv</string>
+    <string name="custom_url_scheme">com.SAADX25.cortextv</string>
+</resources>

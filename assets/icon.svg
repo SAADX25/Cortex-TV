@@ -1,0 +1,148 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Deep blue radial background -->
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0F2847"/>
+      <stop offset="70%" stop-color="#0A192F"/>
+      <stop offset="100%" stop-color="#060F1F"/>
+    </radialGradient>
+
+    <!-- Earth sphere gradient -->
+    <radialGradient id="earth" cx="45%" cy="40%" r="42%">
+      <stop offset="0%" stop-color="#1B4F8A"/>
+      <stop offset="45%" stop-color="#0E3460"/>
+      <stop offset="80%" stop-color="#091E3A"/>
+      <stop offset="100%" stop-color="#060F20"/>
+    </radialGradient>
+
+    <!-- Atmosphere glow -->
+    <radialGradient id="atmo" cx="50%" cy="50%" r="50%">
+      <stop offset="70%" stop-color="transparent"/>
+      <stop offset="88%" stop-color="rgba(0,255,255,0.06)"/>
+      <stop offset="95%" stop-color="rgba(0,255,255,0.12)"/>
+      <stop offset="100%" stop-color="transparent"/>
+    </radialGradient>
+
+    <!-- Metallic C gradient -->
+    <linearGradient id="metalC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8F4FD"/>
+      <stop offset="20%" stop-color="#B0D4F1"/>
+      <stop offset="40%" stop-color="#E0EFF9"/>
+      <stop offset="55%" stop-color="#7CB8DE"/>
+      <stop offset="75%" stop-color="#C5E2F5"/>
+      <stop offset="100%" stop-color="#8EC8E8"/>
+    </linearGradient>
+
+    <!-- C letter shadow/depth -->
+    <linearGradient id="metalCshadow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#3A7BB8"/>
+      <stop offset="50%" stop-color="#5A9FD4"/>
+      <stop offset="100%" stop-color="#2A6090"/>
+    </linearGradient>
+
+    <!-- Cyan glow filter -->
+    <filter id="cyanGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="8" result="blur"/>
+      <feFlood flood-color="#00FFFF" flood-opacity="0.4"/>
+      <feComposite in2="blur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Subtle icon outer glow -->
+    <filter id="outerGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="12"/>
+      <feFlood flood-color="#00FFFF" flood-opacity="0.15"/>
+      <feComposite in2="SourceAlpha" operator="in" result="glow"/>
+      <feMerge>
+        <feMergeNode in="glow"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Clip for globe circle -->
+    <clipPath id="globeClip">
+      <circle cx="512" cy="512" r="340"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background fill -->
+  <rect width="1024" height="1024" rx="224" fill="url(#bg)"/>
+
+  <!-- Earth sphere -->
+  <circle cx="512" cy="512" r="340" fill="url(#earth)"/>
+
+  <!-- Neural network data lines (within globe) -->
+  <g clip-path="url(#globeClip)" opacity="0.5">
+    <!-- Latitude lines -->
+    <ellipse cx="512" cy="350" rx="310" ry="80" fill="none" stroke="#00FFFF" stroke-width="0.8" opacity="0.25"/>
+    <ellipse cx="512" cy="512" rx="340" ry="90" fill="none" stroke="#00FFFF" stroke-width="1" opacity="0.35"/>
+    <ellipse cx="512" cy="670" rx="300" ry="75" fill="none" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+
+    <!-- Longitude arcs -->
+    <ellipse cx="512" cy="512" rx="90" ry="340" fill="none" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+    <ellipse cx="512" cy="512" rx="200" ry="340" fill="none" stroke="#00FFFF" stroke-width="0.8" opacity="0.25"/>
+    <ellipse cx="512" cy="512" rx="290" ry="340" fill="none" stroke="#00FFFF" stroke-width="0.8" opacity="0.15" transform="rotate(15,512,512)"/>
+
+    <!-- Neural network nodes -->
+    <circle cx="380" cy="400" r="4" fill="#00FFFF" opacity="0.7"/>
+    <circle cx="580" cy="360" r="3" fill="#00FFFF" opacity="0.6"/>
+    <circle cx="450" cy="550" r="3.5" fill="#00FFFF" opacity="0.5"/>
+    <circle cx="650" cy="480" r="4" fill="#00FFFF" opacity="0.65"/>
+    <circle cx="400" cy="650" r="3" fill="#00FFFF" opacity="0.45"/>
+    <circle cx="560" cy="620" r="3.5" fill="#00FFFF" opacity="0.55"/>
+    <circle cx="700" cy="560" r="3" fill="#00FFFF" opacity="0.4"/>
+    <circle cx="340" cy="500" r="3" fill="#00FFFF" opacity="0.5"/>
+    <circle cx="620" cy="700" r="2.5" fill="#00FFFF" opacity="0.35"/>
+    <circle cx="480" cy="380" r="3" fill="#00FFFF" opacity="0.55"/>
+
+    <!-- Neural connections -->
+    <line x1="380" y1="400" x2="580" y2="360" stroke="#00FFFF" stroke-width="0.8" opacity="0.3"/>
+    <line x1="580" y1="360" x2="650" y2="480" stroke="#00FFFF" stroke-width="0.8" opacity="0.25"/>
+    <line x1="450" y1="550" x2="650" y2="480" stroke="#00FFFF" stroke-width="0.8" opacity="0.25"/>
+    <line x1="380" y1="400" x2="450" y2="550" stroke="#00FFFF" stroke-width="0.8" opacity="0.3"/>
+    <line x1="450" y1="550" x2="400" y2="650" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+    <line x1="450" y1="550" x2="560" y2="620" stroke="#00FFFF" stroke-width="0.8" opacity="0.25"/>
+    <line x1="650" y1="480" x2="700" y2="560" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+    <line x1="560" y1="620" x2="700" y2="560" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+    <line x1="340" y1="500" x2="380" y2="400" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+    <line x1="340" y1="500" x2="450" y2="550" stroke="#00FFFF" stroke-width="0.8" opacity="0.25"/>
+    <line x1="400" y1="650" x2="560" y2="620" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+    <line x1="560" y1="620" x2="620" y2="700" stroke="#00FFFF" stroke-width="0.8" opacity="0.15"/>
+    <line x1="480" y1="380" x2="580" y2="360" stroke="#00FFFF" stroke-width="0.8" opacity="0.25"/>
+    <line x1="480" y1="380" x2="380" y2="400" stroke="#00FFFF" stroke-width="0.8" opacity="0.2"/>
+    <line x1="480" y1="380" x2="450" y2="550" stroke="#00FFFF" stroke-width="0.8" opacity="0.15"/>
+  </g>
+
+  <!-- Atmosphere rim glow -->
+  <circle cx="512" cy="512" r="340" fill="url(#atmo)"/>
+  <circle cx="512" cy="512" r="342" fill="none" stroke="rgba(0,255,255,0.1)" stroke-width="4"/>
+
+  <!-- Metallic C letter - centered, large, with depth -->
+  <g filter="url(#outerGlow)">
+    <!-- C shadow/back layer for depth -->
+    <path d="M 620,340
+             A 220,220 0 1,0 620,684
+             L 620,636
+             A 172,172 0 1,1 620,388
+             Z"
+          fill="url(#metalCshadow)" opacity="0.6" transform="translate(3,3)"/>
+
+    <!-- C main metallic face -->
+    <path d="M 620,340
+             A 220,220 0 1,0 620,684
+             L 620,636
+             A 172,172 0 1,1 620,388
+             Z"
+          fill="url(#metalC)"/>
+
+    <!-- Specular highlight on C -->
+    <path d="M 620,345
+             A 218,218 0 0,0 350,420
+             A 160,160 0 0,1 620,392
+             Z"
+          fill="white" opacity="0.15"/>
+  </g>
+</svg>

@@ -4,7 +4,7 @@
    are mounted – slashing DOM nodes & RAM usage.
    ────────────────────────────────────────────────── */
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, memo } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "../hooks/useIPTV";
 
@@ -42,20 +42,26 @@ interface ChannelListProps {
   loading: boolean;
   error: string | null;
   onPlayChannel?: (channel: ChannelWithStream) => void;
-  onClose: () => void;
+  onClose?: () => void;
   favorites: ChannelWithStream[];
   onToggleFavorite: (channel: ChannelWithStream) => void;
+  /** When true on mobile, adds top padding so the list starts below the docked player */
+  isPlaying?: boolean;
+  /** The currently-playing channel id (used to highlight the active row) */
+  playingChannelId?: string | null;
 }
 
 /* ── Memoised row component ── */
-function ChannelRow({
+const ChannelRow = memo(function ChannelRow({
   ch,
   isFav,
+  isActive,
   onPlay,
   onToggleFav,
 }: {
   ch: ChannelWithStream;
   isFav: boolean;
+  isActive: boolean;
   onPlay: () => void;
   onToggleFav: () => void;
 }) {
@@ -64,6 +70,7 @@ function ChannelRow({
   >("idle");
 
   /* ── Auto-ping on mount (safe with virtuoso — only visible rows mount) ── */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!ch.streamUrl) return;
     const controller = new AbortController();
@@ -105,13 +112,23 @@ function ChannelRow({
   };
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={ch.streamUrl ? 0 : -1}
       onClick={() => ch.streamUrl && onPlay()}
-      disabled={!ch.streamUrl}
-      className={`pointer-events-auto w-full flex items-center gap-3 rounded-lg px-3 py-2.5 mb-1 text-left transition-colors ${
-        ch.streamUrl
-          ? "hover:bg-cyan-500/10 cursor-pointer"
-          : "opacity-40 cursor-not-allowed"
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && ch.streamUrl) {
+          e.preventDefault();
+          onPlay();
+        }
+      }}
+      aria-disabled={!ch.streamUrl}
+      className={`pointer-events-auto w-full flex items-center gap-4 md:gap-3 rounded-lg px-4 md:px-3 py-3.5 md:py-2.5 mb-1 text-left transition-colors outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50 active:scale-[0.98] ${
+        isActive
+          ? "bg-cyan-500/15 ring-1 ring-cyan-400/30"
+          : ch.streamUrl
+            ? "hover:bg-cyan-500/10 cursor-pointer"
+            : "opacity-40 cursor-not-allowed"
       }`}
     >
       {/* Flag / Logo */}
@@ -160,7 +177,15 @@ function ChannelRow({
 
       {/* Info */}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-white truncate">{ch.name}</p>
+        <div className="flex items-center gap-2">
+          <p className={`text-sm font-medium truncate ${isActive ? "text-cyan-400" : "text-white"}`}>{ch.name}</p>
+          {isActive && (
+            <span className="shrink-0 flex items-center gap-1 text-[9px] text-cyan-400/80 font-medium uppercase tracking-wider">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_4px_rgba(0,255,255,0.6)]" />
+              LIVE
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2 mt-0.5">
           {ch.categories.length > 0 && (
             <span className="text-[10px] text-cyan-400/60 uppercase tracking-wider truncate">
@@ -232,9 +257,9 @@ function ChannelRow({
       ) : (
         <span className="shrink-0 text-[10px] text-white/20">offline</span>
       )}
-    </button>
-  );
-}
+    </div>
+    );
+  });
 
 export default function ChannelList({
   countryName,
@@ -245,8 +270,16 @@ export default function ChannelList({
   onClose,
   favorites,
   onToggleFavorite,
+  isPlaying = false,
+  playingChannelId = null,
 }: ChannelListProps) {
   const [search, setSearch] = useState("");
+  /* Debounced value — filter only runs after 300 ms pause in typing */
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
   /* Build a Set for O(1) favourite lookup instead of .some() per row */
   const favSet = useMemo(
@@ -256,16 +289,16 @@ export default function ChannelList({
 
   const filtered = useMemo(
     () =>
-      search
+      debouncedSearch
         ? channels.filter(
             (ch) =>
-              ch.name.toLowerCase().includes(search.toLowerCase()) ||
+              ch.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
               ch.categories.some((c) =>
-                c.toLowerCase().includes(search.toLowerCase())
+                c.toLowerCase().includes(debouncedSearch.toLowerCase())
               )
           )
         : channels,
-    [channels, search]
+    [channels, debouncedSearch]
   );
 
   /* Row renderer for Virtuoso */
@@ -276,36 +309,44 @@ export default function ChannelList({
         <ChannelRow
           ch={ch}
           isFav={favSet.has(ch.id)}
+          isActive={ch.id === playingChannelId}
           onPlay={() => onPlayChannel?.(ch)}
           onToggleFav={() => onToggleFavorite(ch)}
         />
       );
     },
-    [filtered, favSet, onPlayChannel, onToggleFavorite]
+    [filtered, favSet, playingChannelId, onPlayChannel, onToggleFavorite]
   );
 
   /* Empty / loading / error states shown inside the Virtuoso area */
   const showVirtualList = !loading && !error && filtered.length > 0;
 
   return (
-    <div className="absolute inset-y-0 right-0 w-[420px] max-w-full z-30 flex flex-col bg-black/80 backdrop-blur-xl border-l border-cyan-500/15 animate-slide-in">
+    <div
+      className={
+        "fixed top-12 md:top-0 bottom-0 right-0 w-full md:w-[420px] md:max-w-full z-[60] md:z-30 md:absolute flex flex-col bg-black/95 md:bg-black/80 backdrop-blur-xl border-l border-cyan-500/15 animate-slide-in" +
+        /* When the player is docked at top on mobile, push list below video + control bar */
+        (isPlaying ? " pt-[calc(100vw*9/16+2.5rem)] md:pt-0" : "") +
+        /* Always leave room for the bottom nav bar on mobile */
+        " pb-24 md:pb-0"
+      }
+    >
       {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/5">
+      <div className="flex items-center justify-between gap-3 px-5 pt-4 md:pt-4 pb-5 md:pb-4 border-b border-white/5">
         <div className="min-w-0">
-          <p className="text-[10px] font-medium uppercase tracking-widest text-cyan-400/70">
-            Channels
-          </p>
           <h2 className="text-lg font-semibold text-white truncate">
             {countryName}
           </h2>
         </div>
-        <button
-          onClick={onClose}
-          className="pointer-events-auto shrink-0 flex items-center justify-center h-8 w-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer"
-          title="Close"
-        >
-          ✕
-        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            className="pointer-events-auto shrink-0 flex items-center justify-center h-10 w-10 md:h-8 md:w-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer active:scale-95"
+            title="Close"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* ── Search ── */}
@@ -315,7 +356,7 @@ export default function ChannelList({
           placeholder="Search channels…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 transition-colors"
+          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 md:px-3 py-3 md:py-2 text-base md:text-sm text-white placeholder-white/30 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 transition-colors"
         />
       </div>
 
@@ -360,7 +401,7 @@ export default function ChannelList({
 
       {/* ── Footer stats ── */}
       {!loading && (
-        <div className="px-5 py-3 border-t border-white/5 text-[10px] text-white/30 flex justify-between">
+        <div className="px-5 py-4 md:py-3 border-t border-white/5 text-[11px] md:text-[10px] text-white/30 flex justify-between">
           <span>
             {filtered.length} channel{filtered.length !== 1 ? "s" : ""}
           </span>

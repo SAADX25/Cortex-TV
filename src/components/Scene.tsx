@@ -12,6 +12,7 @@ interface SceneProps {
   rotationSpeed?: number;
   atmosphereIntensity?: number;
   focusCountryIso?: string | null;
+  paused?: boolean;
 }
 
 export default function Scene({
@@ -20,6 +21,7 @@ export default function Scene({
   rotationSpeed,
   atmosphereIntensity,
   focusCountryIso,
+  paused,
 }: SceneProps) {
   const handleGlobeClick = useCallback(
     (info: GlobeClickInfo) => {
@@ -41,6 +43,7 @@ export default function Scene({
       rotationSpeed={rotationSpeed}
       atmosphereIntensity={atmosphereIntensity}
       focusCountryIso={focusCountryIso}
+      paused={paused}
     />
   );
 }

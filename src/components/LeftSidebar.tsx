@@ -79,56 +79,51 @@ export default function LeftSidebar({
   onOpenSearch,
   onOpenSettings,
 }: LeftSidebarProps) {
+  /* ── Shared icon for day/night ── */
+  const dayNightIcon = isNightMode ? (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2" />
+      <path d="M12 20v2" />
+      <path d="m4.93 4.93 1.41 1.41" />
+      <path d="m17.66 17.66 1.41 1.41" />
+      <path d="M2 12h2" />
+      <path d="M20 12h2" />
+      <path d="m6.34 17.66-1.41 1.41" />
+      <path d="m19.07 4.93-1.41 1.41" />
+    </svg>
+  ) : (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+    </svg>
+  );
+
+  const favIcon = (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+      fill={showFavorites ? "currentColor" : "none"}
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      className={showFavorites ? "text-cyan-400" : ""}
+    >
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+
   return (
-    <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-4 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 p-3 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-      {/* Day / Night toggle */}
-      <ToolButton
-        icon={
-          isNightMode ? (
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="4" />
-              <path d="M12 2v2" />
-              <path d="M12 20v2" />
-              <path d="m4.93 4.93 1.41 1.41" />
-              <path d="m17.66 17.66 1.41 1.41" />
-              <path d="M2 12h2" />
-              <path d="M20 12h2" />
-              <path d="m6.34 17.66-1.41 1.41" />
-              <path d="m19.07 4.93-1.41 1.41" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-            </svg>
-          )
-        }
-        label={isNightMode ? "Switch to Day" : "Switch to Night"}
-        onClick={onToggleNightMode}
-      />
-
-      {/* Divider */}
-      <div className="w-5 border-t border-white/10" />
-
-      <ToolButton icon={<SearchIcon />} label="Search" onClick={onOpenSearch} />
-      <ToolButton
-        icon={
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-            fill={showFavorites ? "currentColor" : "none"}
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            className={showFavorites ? "text-cyan-400" : ""}
-          >
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-          </svg>
-        }
-        label="Favorites"
-        onClick={onToggleFavorites}
-      />
-      <ToolButton icon={<WrenchIcon />} label="Tools" />
-
-      {/* Divider */}
-      <div className="w-5 border-t border-white/10" />
-
-      <ToolButton icon={<SettingsIcon />} label="Settings" onClick={onOpenSettings} />
-    </div>
+    <>
+      {/* ── Desktop pill toolbar (hidden on mobile) ── */}
+      <div className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-4 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 p-3 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
+        <ToolButton
+          icon={dayNightIcon}
+          label={isNightMode ? "Switch to Day" : "Switch to Night"}
+          onClick={onToggleNightMode}
+        />
+        <div className="w-5 border-t border-white/10" />
+        <ToolButton icon={<SearchIcon />} label="Search" onClick={onOpenSearch} />
+        <ToolButton icon={favIcon} label="Favorites" onClick={onToggleFavorites} />
+        <ToolButton icon={<WrenchIcon />} label="Tools" />
+        <div className="w-5 border-t border-white/10" />
+        <ToolButton icon={<SettingsIcon />} label="Settings" onClick={onOpenSettings} />
+      </div>
+    </>
   );
 }

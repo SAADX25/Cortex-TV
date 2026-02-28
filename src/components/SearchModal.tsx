@@ -18,15 +18,65 @@ const flagUrl = (iso: string) => {
   return `https://flagcdn.com/w80/${FLAG_CODE_MAP[code] ?? code}.png`;
 };
 
+/* ── Category icon components (inline Lucide-style SVGs) ── */
+const CatIcons: Record<string, React.ReactNode> = {
+  all: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+  ),
+  news: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+  ),
+  sports: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+  ),
+  movies: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m7 3 0 18"/><path d="m17 3 0 18"/><path d="M3 7.5h4"/><path d="M17 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 16.5h4"/></svg>
+  ),
+  music: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  ),
+  entertainment: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526"/><circle cx="12" cy="8" r="6"/></svg>
+  ),
+  kids: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>
+  ),
+};
+
+/* ── Large category icons for mobile grid tiles ── */
+const GridCatIcons: Record<string, React.ReactNode> = {
+  all: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+  ),
+  news: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+  ),
+  sports: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+  ),
+  movies: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m7 3 0 18"/><path d="m17 3 0 18"/><path d="M3 7.5h4"/><path d="M17 7.5h4"/><path d="M3 12h18"/><path d="M3 16.5h4"/><path d="M17 16.5h4"/></svg>
+  ),
+  music: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  ),
+  entertainment: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="m15.477 12.89 1.515 8.526a.5.5 0 0 1-.81.47l-3.58-2.687a1 1 0 0 0-1.197 0l-3.586 2.686a.5.5 0 0 1-.81-.469l1.514-8.526"/><circle cx="12" cy="8" r="6"/></svg>
+  ),
+  kids: (
+    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12h.01"/><path d="M15 12h.01"/><path d="M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5"/><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1"/></svg>
+  ),
+};
+
 /* ── Quick-filter categories ── */
 const FILTER_CHIPS = [
-  { label: "All", value: null },
-  { label: "News", value: "news" },
-  { label: "Sports", value: "sports" },
-  { label: "Movies", value: "movies" },
-  { label: "Music", value: "music" },
-  { label: "Entertainment", value: "entertainment" },
-  { label: "Kids", value: "kids" },
+  { label: "All", value: null, icon: "all" },
+  { label: "News", value: "news", icon: "news" },
+  { label: "Sports", value: "sports", icon: "sports" },
+  { label: "Movies", value: "movies", icon: "movies" },
+  { label: "Music", value: "music", icon: "music" },
+  { label: "Entertainment", value: "entertainment", icon: "entertainment" },
+  { label: "Kids", value: "kids", icon: "kids" },
 ] as const;
 
 /* ── Pulsing search icon ── */
@@ -189,12 +239,14 @@ interface SearchModalProps {
   open: boolean;
   onClose: () => void;
   onSelectChannel: (channel: ChannelWithStream) => void;
+  onNavigate?: (tab: "globe" | "search" | "favorites" | "settings") => void;
 }
 
 export default function SearchModal({
   open,
   onClose,
   onSelectChannel,
+  onNavigate,
 }: SearchModalProps) {
   const [query, setQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
@@ -247,7 +299,7 @@ export default function SearchModal({
       );
       setResults(res);
       setSearching(false);
-    }, 250);
+    }, 300);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -298,39 +350,45 @@ export default function SearchModal({
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex flex-col ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
-      onClick={handleClose}
+      className={`fixed top-12 md:top-0 bottom-0 left-0 right-0 z-[200] flex flex-col bg-[#0f172a] md:bg-transparent pb-20 md:pb-0 ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
     >
-      {/* ── Full-screen backdrop ── */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" />
+      {/* ── Full-screen backdrop (desktop only – mobile has solid bg) ── */}
+      <div className="hidden md:block absolute inset-0 bg-black/80 backdrop-blur-xl" />
 
       {/* ── Content wrapper ── */}
       <div
         onClick={(e) => e.stopPropagation()}
         className={`relative flex-1 flex flex-col overflow-hidden ${closing ? "animate-modal-out" : "animate-modal-in"}`}
       >
-        {/* ── Search area — centered initially, slides up on results ── */}
-        <div className={`shrink-0 w-full max-w-2xl mx-auto px-6 pb-0 transition-all duration-500 ease-out ${
-          showHint ? "pt-[32vh]" : "pt-[6vh]"
+        {/* ── Search area ── */}
+        <div className={`shrink-0 w-full max-w-2xl mx-auto px-4 md:px-6 pb-0 pt-4 md:pt-6 md:transition-all md:duration-500 md:ease-out ${
+          showHint
+            ? "md:pt-[32vh]"
+            : "md:pt-12"
         }`}>
-          {/* ── Large search input ── */}
+
+          {/* ── Search bar (mobile + desktop) ── */}
           <div
-            className={`relative flex items-center gap-4 rounded-2xl border px-6 py-4 transition-all duration-500 ${
+            className={`flex relative items-center gap-3 md:gap-4 rounded-xl md:rounded-full border h-12 md:h-14 px-5 md:px-6 transition-all duration-300 shadow-lg md:shadow-none ${
               focused
-                ? "border-cyan-500/40 bg-white/[0.04] shadow-[0_0_40px_rgba(0,255,255,0.08),inset_0_0_20px_rgba(0,255,255,0.03)]"
-                : "border-white/[0.06] bg-white/[0.02]"
+                ? "border-cyan-500/40 bg-[#1a2b4c] md:ring-2 ring-cyan-500/20 shadow-[0_4px_28px_rgba(0,255,255,0.12)] md:shadow-[0_4px_24px_rgba(0,255,255,0.04)]"
+                : "border-white/10 bg-[#1a2b4c] md:border-transparent md:bg-white/[0.07] md:hover:bg-white/[0.11]"
             }`}
           >
             <PulsingSearchIcon active={focused || hasQuery} />
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search channels, categories, or countries…"
+              inputMode="search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="Search channels, countries…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              className="flex-1 bg-transparent text-lg text-white placeholder-white/20 outline-none font-light tracking-wide"
+              className="flex-1 bg-transparent text-[15px] md:text-lg text-white placeholder-white/25 outline-none font-light tracking-wide min-w-0 caret-cyan-400"
             />
             {/* Result badge */}
             {(hasQuery || hasFilter) && !searching && results.length > 0 && (
@@ -341,64 +399,121 @@ export default function SearchModal({
             {searching && (
               <div className="shrink-0 h-5 w-5 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
             )}
+            {/* Clear query button */}
+            {hasQuery && (
+              <button
+                onClick={() => setQuery("")}
+                className="shrink-0 flex items-center justify-center h-9 w-9 -mr-2 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/40 hover:text-white/80 transition-all active:scale-95 cursor-pointer"
+                aria-label="Clear search"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
           </div>
 
-          {/* ── Quick filter chips ── */}
-          <div className="flex items-center gap-2 mt-4 overflow-x-auto pb-1 scrollbar-thin">
+          {/* ── Mobile: square grid tiles (idle discovery) ── */}
+          {showHint && (
+            <div className="md:hidden grid grid-cols-3 gap-4 mt-8">
+              {FILTER_CHIPS.map((chip) => {
+                const isActive = activeFilter === chip.value;
+                return (
+                  <button
+                    key={chip.label}
+                    onClick={() => setActiveFilter(isActive ? null : chip.value)}
+                    className={`aspect-square rounded-2xl border flex flex-col items-center justify-center gap-3 transition-all duration-200 active:scale-95 cursor-pointer ${
+                      isActive
+                        ? "bg-cyan-600 border-cyan-400/40 shadow-xl shadow-cyan-500/30 text-white"
+                        : "bg-white/[0.03] border-white/5 text-white/60 backdrop-blur-md"
+                    }`}
+                  >
+                    {GridCatIcons[chip.icon]}
+                    <span className="text-sm font-medium text-white/90">{chip.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Mobile: compact chip strip (while searching / results active) ── */}
+          {!showHint && (
+            <div className="md:hidden flex items-center gap-2 mt-4 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              {FILTER_CHIPS.map((chip) => {
+                const isActive = activeFilter === chip.value;
+                return (
+                  <button
+                    key={chip.label}
+                    onClick={() => setActiveFilter(isActive ? null : chip.value)}
+                    className={`shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-full text-[13px] whitespace-nowrap transition-all duration-200 cursor-pointer ${
+                      isActive
+                        ? "bg-cyan-500 text-black font-bold shadow-lg shadow-cyan-500/30 scale-[1.02]"
+                        : "bg-white/[0.06] text-gray-300 font-medium active:bg-white/[0.12] active:scale-95"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Desktop: horizontal pill chips ── */}
+          <div className="hidden md:flex items-center gap-2.5 mt-5 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             {FILTER_CHIPS.map((chip) => {
               const isActive = activeFilter === chip.value;
               return (
                 <button
                   key={chip.label}
-                  onClick={() =>
-                    setActiveFilter(isActive ? null : chip.value)
-                  }
-                  className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-medium transition-all duration-300 cursor-pointer border ${
+                  onClick={() => setActiveFilter(isActive ? null : chip.value)}
+                  className={`shrink-0 flex items-center gap-2 px-5 py-2.5 rounded-full text-sm whitespace-nowrap transition-all duration-200 cursor-pointer ${
                     isActive
-                      ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300 shadow-[0_0_15px_rgba(0,255,255,0.1)]"
-                      : "bg-white/[0.03] border-white/[0.06] text-white/35 hover:text-white/60 hover:border-white/15 hover:bg-white/[0.06]"
+                      ? "bg-cyan-500 text-black font-bold shadow-lg shadow-cyan-500/30 scale-[1.02]"
+                      : "bg-white/[0.06] text-gray-300 font-medium hover:bg-white/10"
                   }`}
                 >
+                  {CatIcons[chip.icon]}
                   {chip.label}
                 </button>
               );
             })}
           </div>
+
         </div>
 
         {/* ── Results / states area ── */}
-        <div className={`flex-1 overflow-y-auto scrollbar-thin transition-all duration-500 ease-out ${
-          showHint ? "opacity-0 pointer-events-none" : "mt-6 opacity-100"
+        <div className={`flex-1 overflow-y-auto scrollbar-thin transition-all duration-500 ease-out [-webkit-overflow-scrolling:touch] ${
+          showHint ? "md:opacity-0 md:pointer-events-none" : "mt-4 md:mt-6 opacity-100"
         }`}>
-          <div className="w-full max-w-5xl mx-auto px-6 pb-24">
+
+          <div className="w-full max-w-5xl mx-auto px-4 md:px-6 pb-24 md:pb-24">
             {/* Loading state */}
             {searching && (
-              <div className="flex flex-col items-center justify-center py-20">
+              <div className="flex flex-col items-center justify-center py-14 md:py-20">
                 <div className="relative">
-                  <div className="h-10 w-10 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
+                  <div className="h-8 w-8 md:h-10 md:w-10 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(0,255,255,0.6)]" />
+                    <div className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(0,255,255,0.6)]" />
                   </div>
                 </div>
-                <p className="mt-4 text-sm text-white/25">Searching global database…</p>
+                <p className="mt-3 md:mt-4 text-[13px] md:text-sm text-white/25">Searching global database…</p>
               </div>
             )}
 
-
-
             {/* Empty state */}
             {showEmpty && (
-              <div className="flex flex-col items-center justify-center py-20 text-center">
-                <div className="relative mb-5">
+              <div className="flex flex-col items-center justify-center py-14 md:py-20 text-center">
+                <div className="relative mb-4 md:mb-5">
                   <div className="absolute inset-0 -m-4 rounded-full bg-red-500/5 blur-xl" />
-                  <div className="relative p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <div className="relative p-3.5 md:p-4 rounded-2xl bg-white/[0.02] border border-white/5">
                     <BrokenSignalIcon />
                   </div>
                 </div>
-                <h3 className="text-base font-semibold text-white/50 mb-1.5">
+                <h3 className="text-[15px] md:text-base font-semibold text-white/50 mb-1.5">
                   No channels found
                 </h3>
-                <p className="text-sm text-white/20 max-w-md">
+                <p className="text-[13px] md:text-sm text-white/20 max-w-md px-4">
                   No channels found in the global database
                   {hasQuery && (
                     <> matching &ldquo;<span className="text-cyan-400/50">{query}</span>&rdquo;</>
@@ -411,11 +526,11 @@ export default function SearchModal({
               </div>
             )}
 
-            {/* Results grid */}
+            {/* Results */}
             {showResults && (
               <>
                 {/* Results count bar */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center justify-between mb-3 md:mb-4 px-1">
                   <p className="text-[11px] text-white/20 uppercase tracking-wider">
                     {results.length} result{results.length !== 1 ? "s" : ""}
                     {resultCount > 0 && (
@@ -425,14 +540,26 @@ export default function SearchModal({
                   {hasFilter && (
                     <button
                       onClick={() => setActiveFilter(null)}
-                      className="text-[10px] text-cyan-400/50 hover:text-cyan-400 transition-colors cursor-pointer"
+                      className="text-[10px] text-cyan-400/50 hover:text-cyan-400 active:text-cyan-300 transition-colors cursor-pointer"
                     >
                       Clear filter ✕
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                {/* Mobile: compact list */}
+                <div className="md:hidden flex flex-col gap-1">
+                  {results.map((ch) => (
+                    <ResultCard
+                      key={ch.id}
+                      channel={ch}
+                      onSelect={() => handleSelect(ch)}
+                    />
+                  ))}
+                </div>
+
+                {/* Desktop: card grid */}
+                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {results.map((ch) => (
                     <ResultCard
                       key={ch.id}
@@ -446,8 +573,63 @@ export default function SearchModal({
           </div>
         </div>
 
-        {/* ── Bottom keyboard hint bar ── */}
-        <div className="shrink-0 absolute bottom-0 inset-x-0 flex items-center justify-center gap-6 py-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
+        {/* ── Mobile: bottom nav dock ── */}
+        <div className="md:hidden shrink-0 fixed bottom-0 left-0 right-0 z-[9001]">
+          <div className="bg-[#0A0F1C] border-t border-white/[0.06] pb-[env(safe-area-inset-bottom)]">
+            {/* Navigation row */}
+            <div className="flex items-stretch h-[52px]">
+              {/* Globe */}
+              <button
+                onClick={() => onNavigate?.("globe")}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 text-white/40 active:text-white/60 active:scale-95 transition-all cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+                  <path d="M2 12h20" />
+                </svg>
+                <span className="text-[9px] font-medium tracking-wide">Globe</span>
+              </button>
+
+              {/* Search (active) */}
+              <button
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 text-cyan-400 transition-all cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <span className="text-[9px] font-bold tracking-wide">Search</span>
+              </button>
+
+              {/* Favorites */}
+              <button
+                onClick={() => onNavigate?.("favorites")}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 text-white/40 active:text-white/60 active:scale-95 transition-all cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+                <span className="text-[9px] font-medium tracking-wide">Favorites</span>
+              </button>
+
+              {/* Settings */}
+              <button
+                onClick={() => onNavigate?.("settings")}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 text-white/40 active:text-white/60 active:scale-95 transition-all cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <span className="text-[9px] font-medium tracking-wide">Settings</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Bottom keyboard hint bar (hidden on mobile — no keyboard shortcuts) ── */}
+        <div className="shrink-0 absolute bottom-0 inset-x-0 hidden md:flex items-center justify-center gap-6 py-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent pointer-events-none">
           <div className="flex items-center gap-2">
             <kbd className="px-2 py-0.5 rounded text-[10px] font-mono text-white/25 bg-white/[0.04] border border-white/[0.06]">
               ESC
