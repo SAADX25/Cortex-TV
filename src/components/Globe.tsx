@@ -3,7 +3,7 @@
    Neon-styled country polygons with CDN textures.
    ────────────────────────────────────────────── */
 
-import { useEffect, useRef, useState, useCallback, memo } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import GlobeGL from "react-globe.gl";
 import * as THREE from "three";
 import Crosshair from "./Crosshair";
@@ -26,6 +26,17 @@ function pointInRing2D(
   return inside;
 }
 
+/** Check whether a single polygon (outer ring + optional holes) contains a point. */
+function polygonContainsPoint(rings: number[][][], lng: number, lat: number): boolean {
+  // Must be inside the outer ring
+  if (!pointInRing2D(lng, lat, rings[0])) return false;
+  // Must NOT be inside any hole (rings[1], rings[2], …)
+  for (let i = 1; i < rings.length; i++) {
+    if (pointInRing2D(lng, lat, rings[i])) return false;
+  }
+  return true;
+}
+
 /** Check whether a GeoJSON feature (Polygon / MultiPolygon) contains a point. */
 function geoContainsPoint(
   feature: any,
@@ -35,11 +46,11 @@ function geoContainsPoint(
   const geom = feature?.geometry;
   if (!geom) return false;
   if (geom.type === "Polygon") {
-    return pointInRing2D(lng, lat, geom.coordinates[0]);
+    return polygonContainsPoint(geom.coordinates, lng, lat);
   }
   if (geom.type === "MultiPolygon") {
     return geom.coordinates.some((poly: number[][][]) =>
-      pointInRing2D(lng, lat, poly[0])
+      polygonContainsPoint(poly, lng, lat)
     );
   }
   return false;
@@ -304,7 +315,78 @@ function GlobeInner({
     return { name, iso };
   }, []);
 
-  /* ── Three.js Raycaster: find polygon mesh at screen center ── */
+  /* ── Bounding-box spatial index for fast geo rejection ── */
+  const countryBBoxes = useMemo(() => {
+    return countries.map((f: any) => {
+      let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
+      const walk = (arr: any) => {
+        if (typeof arr[0] === "number") {
+          if (arr[0] < minLng) minLng = arr[0];
+          if (arr[0] > maxLng) maxLng = arr[0];
+          if (arr[1] < minLat) minLat = arr[1];
+          if (arr[1] > maxLat) maxLat = arr[1];
+        } else {
+          for (const sub of arr) walk(sub);
+        }
+      };
+      if (f.geometry?.coordinates) walk(f.geometry.coordinates);
+      // If bbox spans > 180° in longitude it likely crosses the antimeridian;
+      // expand to full range so the pre-filter never rejects it incorrectly.
+      const wrapLng = maxLng - minLng > 180;
+      return {
+        feature: f,
+        minLng: wrapLng ? -180 : minLng,
+        maxLng: wrapLng ?  180 : maxLng,
+        minLat,
+        maxLat,
+      };
+    });
+  }, [countries]);
+
+  /* ── Analytical ray-sphere intersection → lat/lng ──
+     Casts a ray from screen center to the globe surface and returns
+     the exact geographic coordinates of the intersection point.
+     Accurate regardless of camera tilt, zoom, or orbit offset.
+     Uses the three-globe coordinate convention (Y-up). */
+  const GLOBE_RADIUS = 100; // three-globe default
+  const surfaceLatLngAtCenter = useCallback((): { lat: number; lng: number } | null => {
+    const globe = globeRef.current;
+    if (!globe) return null;
+    const camera = globe.camera();
+    if (!camera) return null;
+
+    raycasterRef.current.setFromCamera(centerNDC.current, camera);
+    const { origin, direction } = raycasterRef.current.ray;
+
+    /* Analytical ray-sphere intersection (sphere at origin, radius R).
+       Avoids scene traversal  → zero GC pressure, runs at 60 fps. */
+    const a = direction.dot(direction);                      // always 1 for normalised dir
+    const b = 2 * origin.dot(direction);
+    const c = origin.dot(origin) - GLOBE_RADIUS * GLOBE_RADIUS;
+    const discriminant = b * b - 4 * a * c;
+    if (discriminant < 0) return null;                       // ray misses the globe
+
+    const t = (-b - Math.sqrt(discriminant)) / (2 * a);      // nearest intersection
+    if (t < 0) return null;                                  // globe behind camera
+
+    const px = origin.x + direction.x * t;
+    const py = origin.y + direction.y * t;
+    const pz = origin.z + direction.z * t;
+    const r  = Math.sqrt(px * px + py * py + pz * pz);
+    if (r < 1) return null;                                  // degenerate
+
+    /* three-globe convention:
+         polar2Cartesian  →  theta = (90 - lng) · π/180
+                              x = r·sin φ·cos θ,  z = r·sin φ·sin θ
+         Inverse:
+           lat = 90 - acos(y / r) · 180/π
+           lng = 90 - atan2(z, x) · 180/π           */
+    const lat = 90 - Math.acos(Math.max(-1, Math.min(1, py / r))) * (180 / Math.PI);
+    const lng = 90 - Math.atan2(pz, px) * (180 / Math.PI);
+    return { lat, lng };
+  }, []);
+
+  /* ── Fallback: raycaster → polygon mesh __data at exact screen center ── */
   const getCenterCountry = useCallback((): any | null => {
     const globe = globeRef.current;
     if (!globe) return null;
@@ -313,37 +395,46 @@ function GlobeInner({
     const scene = globe.scene();
     if (!camera || !scene) return null;
 
-    raycasterRef.current.setFromCamera(centerNDC.current, camera);
-
-    /* Collect all polygon-layer meshes from the scene graph.
-       react-globe.gl nests polygons inside a group whose children
-       are individual country Mesh objects with __data bound. */
+    /* Collect all polygon-layer meshes from the scene graph. */
     const meshes: THREE.Object3D[] = [];
     scene.traverse((obj: THREE.Object3D) => {
       if ((obj as THREE.Mesh).isMesh && (obj as any).__data) {
         meshes.push(obj);
       }
     });
+    if (meshes.length === 0) return null;
 
+    /* Single ray at exact screen center – no offsets to avoid adjacency errors */
+    raycasterRef.current.setFromCamera(centerNDC.current, camera);
     const intersects = raycasterRef.current.intersectObjects(meshes, false);
     if (intersects.length > 0) {
-      return (intersects[0].object as any).__data ?? null;
+      const data = (intersects[0].object as any).__data;
+      if (data) return data;
     }
     return null;
   }, []);
 
-  /* ── Fallback: geo point-in-polygon when raycaster finds nothing ── */
+  /* ── Primary: raycast to globe surface → lat/lng → PIP ── */
   const getCenterCountryGeo = useCallback((): any | null => {
-    if (!globeRef.current || countries.length === 0) return null;
-    const pov = globeRef.current.pointOfView();
-    const { lat, lng } = pov as { lat: number; lng: number };
-    return countries.find((f: any) => geoContainsPoint(f, lng, lat)) ?? null;
-  }, [countries]);
+    if (countryBBoxes.length === 0) return null;
 
-  /* ── Combined center lookup (raycast first, geo fallback) ── */
+    /* Get the exact lat/lng of the surface point under the crosshair */
+    const geo = surfaceLatLngAtCenter();
+    if (!geo) return null;
+    const { lat, lng } = geo;
+
+    // Fast bbox pre-filter, then precise point-in-polygon
+    for (const { feature, minLng, maxLng, minLat, maxLat } of countryBBoxes) {
+      if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
+      if (geoContainsPoint(feature, lng, lat)) return feature;
+    }
+    return null;
+  }, [countryBBoxes, surfaceLatLngAtCenter]);
+
+  /* ── Combined center lookup (geo-precise first, raycaster fallback) ── */
   const getCenterCountryCombined = useCallback((): any | null => {
-    return getCenterCountry() ?? getCenterCountryGeo();
-  }, [getCenterCountry, getCenterCountryGeo]);
+    return getCenterCountryGeo() ?? getCenterCountry();
+  }, [getCenterCountryGeo, getCenterCountry]);
 
   /* ── Select (confirm) the country at center ── */
   const selectFeature = useCallback(
@@ -379,18 +470,19 @@ function GlobeInner({
     }
   }, [paused, getCenterCountryCombined, selectFeature]);
 
-  /* ── Live tracking: update label on every move (throttled ~60 ms) ── */
+  /* ── Live tracking: update label using lightweight geo-only path ── */
   const updateTargetLabel = useCallback(() => {
     const now = Date.now();
-    if (now - throttleRef.current < 60) return;   // throttle
+    if (now - throttleRef.current < 80) return;    // throttle to ~12 Hz
     throttleRef.current = now;
 
     if (paused) { setTargetedCountry(null); return; }
 
-    const feature = getCenterCountryCombined();
+    // Use geo-only (bbox + PIP) — no scene traversal, no raycaster
+    const feature = getCenterCountryGeo();
     const info = feature ? extractCountryInfo(feature) : null;
     setTargetedCountry(info ?? null);
-  }, [paused, getCenterCountryCombined, extractCountryInfo]);
+  }, [paused, getCenterCountryGeo, extractCountryInfo]);
 
   const handlePointerMove = useCallback(() => {
     updateTargetLabel();
@@ -399,7 +491,7 @@ function GlobeInner({
   /* Also run the label update while the globe auto-rotates (no pointer movement) */
   useEffect(() => {
     if (paused) return;
-    const id = setInterval(updateTargetLabel, 120);
+    const id = setInterval(updateTargetLabel, 200);   // ~5 fps label refresh during idle rotation
     return () => clearInterval(id);
   }, [paused, updateTargetLabel]);
 
@@ -412,8 +504,15 @@ function GlobeInner({
     return () => clearInterval(id);
   }, [targetedCountry?.iso]);
 
+  /* ── Bulletproof event blocker for UI overlays ── */
+  const killEvent = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
+
   /* ── Pointer tracking: distinguish tap from drag ── */
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    /* Ignore taps on UI overlays (buttons, icons, etc.) */
+    if ((e.target as HTMLElement).closest?.("button")) return;
+    if ((e.target as HTMLElement).tagName !== "CANVAS") return;
+
     pointerDownRef.current = {
       x: e.clientX,
       y: e.clientY,
@@ -423,6 +522,10 @@ function GlobeInner({
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      /* Ignore taps on UI overlays */
+      if ((e.target as HTMLElement).closest?.("button")) return;
+      if ((e.target as HTMLElement).tagName !== "CANVAS") return;
+
       const down = pointerDownRef.current;
       if (!down) return;
       pointerDownRef.current = null;
@@ -432,12 +535,23 @@ function GlobeInner({
       const dist = Math.sqrt(dx * dx + dy * dy);
       const elapsed = Date.now() - down.time;
 
-      /* Quick tap: < 12 px movement and < 300 ms */
-      if (dist < 12 && elapsed < 300) {
+      /* Quick tap: < 12 px movement and < 300 ms.
+         Only trigger crosshair-based selection for touch/pen (mobile);
+         mouse clicks are handled by onPolygonClick instead. */
+      if (dist < 12 && elapsed < 300 && e.pointerType !== "mouse") {
         selectCountryAtCenter();
       }
     },
     [selectCountryAtCenter]
+  );
+
+  /* ── Direct mouse click on polygon (PC/Desktop) ── */
+  const handlePolygonClick = useCallback(
+    (polygon: any, _event: MouseEvent, _coords: { lat: number; lng: number; altitude: number }) => {
+      if (paused) return;
+      if (polygon) selectFeature(polygon);
+    },
+    [paused, selectFeature]
   );
 
   return (
@@ -452,6 +566,9 @@ function GlobeInner({
     >
       {/* ── Language toggle button (top-left, mirrors Dark-Mode on the right) ── */}
       <button
+        onTouchStart={killEvent}
+        onTouchEnd={killEvent}
+        onPointerDown={killEvent}
         onClick={(e) => { e.stopPropagation(); setUiLang((l) => (l === "en" ? "ar" : "en")); }}
         className="fixed top-[4.5rem] left-4 z-50 md:hidden flex items-center justify-center
                    h-10 w-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10
@@ -480,15 +597,8 @@ function GlobeInner({
         </span>
       </button>
 
-      {/* ── Sniper-mode crosshair + live label ── */}
-      <Crosshair
-        active={crosshairActive}
-        targetName={
-          targetedCountry?.iso
-            ? getTranslatedCountryName(targetedCountry.iso, uiLang)
-            : null
-        }
-      />
+      {/* ── Precision dot (neon blue) ── */}
+      <Crosshair active={crosshairActive} />
 
       {/* ── World Clock badge (premium glass pill) ── */}
       <div
@@ -589,9 +699,9 @@ function GlobeInner({
             border-radius: 4px;
           ">${name}</div>`;
         }}
-        /* ── Interaction: disabled for Sniper Mode ── */
+        /* ── Interaction ── */
         onPolygonHover={() => {}}
-        onPolygonClick={() => {}}
+        onPolygonClick={handlePolygonClick}
         /* ── Performance ── */
         polygonsTransitionDuration={paused ? 0 : 300}
       />

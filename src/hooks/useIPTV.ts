@@ -205,6 +205,62 @@ export function preloadIPTVData(): void {
   ensureData().catch(() => {});
 }
 
+/* ── Quick Access News: fetch all channels with NEWS category/name ── */
+export async function fetchNewsChannels(
+  limit = 300,
+  extraPlaylistChannels?: ChannelWithStream[]
+): Promise<ChannelWithStream[]> {
+  await ensureData();
+  if (!channelCache || !streamCache) return extraPlaylistChannels ?? [];
+
+  const results: ChannelWithStream[] = [];
+  const seenIds = new Set<string>();
+
+  /* 1) Include playlist channels that are YouTube-sourced or have NEWS in category/name */
+  if (extraPlaylistChannels) {
+    for (const ch of extraPlaylistChannels) {
+      const isYouTube =
+        ch.streamUrl &&
+        (ch.streamUrl.includes("youtube.com") ||
+          ch.streamUrl.includes("youtu.be") ||
+          ch.streamUrl.includes("yt.be") ||
+          ch.streamUrl.includes("googlevideo.com"));
+      const isNews =
+        ch.categories.some((c) => c.toLowerCase().includes("news")) ||
+        ch.name.toLowerCase().includes("news");
+      if (isYouTube || isNews) {
+        results.push(ch);
+        seenIds.add(ch.id);
+      }
+    }
+  }
+
+  /* 2) IPTV-org channels with NEWS category or name */
+  for (const ch of channelCache) {
+    if (ch.isNsfw) continue;
+    if (seenIds.has(ch.id)) continue;
+
+    const isNews =
+      ch.categories.some((c) => c.toLowerCase().includes("news")) ||
+      ch.name.toLowerCase().includes("news");
+    if (!isNews) continue;
+
+    results.push({
+      ...ch,
+      streamUrl: streamCache.get(ch.id)?.url ?? null,
+    });
+    seenIds.add(ch.id);
+    if (results.length >= limit) break;
+  }
+
+  /* Channels with streams first, then alphabetical */
+  return results.sort((a, b) => {
+    if (a.streamUrl && !b.streamUrl) return -1;
+    if (!a.streamUrl && b.streamUrl) return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 /* ── Country-endpoint fallback (works for any country) ── */
 function fetchCountryFallback(
   isoCode: string,

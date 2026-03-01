@@ -13,6 +13,54 @@ export default defineConfig({
       host: "localhost",
       port: 5173,
     },
+    proxy: {
+      /* ── Rotana / LBC (hibridcdn) proxy ── */
+      "/proxy/rotana": {
+        target: "https://rotana.hibridcdn.net",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/proxy\/rotana/, ""),
+        headers: {
+          Origin: "https://rotana.net",
+          Referer: "https://rotana.net/",
+        },
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            proxyReq.setHeader("Origin", "https://rotana.net");
+            proxyReq.setHeader("Referer", "https://rotana.net/");
+          });
+          proxy.on("proxyRes", (proxyRes) => {
+            proxyRes.headers["access-control-allow-origin"] = "*";
+            proxyRes.headers["access-control-allow-methods"] = "*";
+            proxyRes.headers["access-control-allow-headers"] = "*";
+            delete proxyRes.headers["x-frame-options"];
+          });
+        },
+      },
+      /* ── MBC / Shahid proxy ── */
+      "/proxy/mbc": {
+        target: "https://mbc.dbrsp.net",
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/proxy\/mbc/, ""),
+        headers: {
+          Origin: "https://shahid.mbc.net",
+          Referer: "https://shahid.mbc.net/",
+        },
+        configure: (proxy) => {
+          proxy.on("proxyReq", (proxyReq) => {
+            proxyReq.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            proxyReq.setHeader("Origin", "https://shahid.mbc.net");
+            proxyReq.setHeader("Referer", "https://shahid.mbc.net/");
+          });
+          proxy.on("proxyRes", (proxyRes) => {
+            proxyRes.headers["access-control-allow-origin"] = "*";
+            proxyRes.headers["access-control-allow-methods"] = "*";
+            proxyRes.headers["access-control-allow-headers"] = "*";
+            delete proxyRes.headers["x-frame-options"];
+          });
+        },
+      },
+    },
   },
   plugins: [
     react(),

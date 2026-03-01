@@ -14,6 +14,7 @@ import SettingsPanel from "./components/SettingsPanel";
 import type { GlobeSettings, PlaylistConfig } from "./components/SettingsPanel";
 import type { GlobeClickInfo, CountryInfo } from "./components/Globe";
 import { useIPTV, type ChannelWithStream } from "./hooks/useIPTV";
+import { fetchNewsChannels } from "./hooks/useIPTV";
 import { fetchAndParseM3U } from "./utils/m3uParser";
 
 const FAVORITES_KEY = "cortex_favorites";
@@ -53,7 +54,7 @@ export default function App() {
   const [playingChannel, setPlayingChannel] =
     useState<ChannelWithStream | null>(null);
   const [isNightMode, setIsNightMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<"globe" | "search" | "favorites" | "settings">("globe");
+  const [activeTab, setActiveTab] = useState<"globe" | "search" | "favorites" | "settings" | "news">("globe");
   const [focusCountryIso, setFocusCountryIso] = useState<string | null>(null);
   /* mobileLeftOpen removed — Menu button now toggles SettingsPanel directly */
   const [favorites, setFavorites] = useState<ChannelWithStream[]>(() => {
@@ -187,6 +188,10 @@ export default function App() {
     });
   }, []);
 
+  /* ── News channels state ── */
+  const [newsChannels, setNewsChannels] = useState<ChannelWithStream[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+
   /* ── Toggle favorites panel ── */
   const handleToggleFavorites = useCallback(() => {
     setActiveTab((prev) => {
@@ -196,6 +201,30 @@ export default function App() {
     setSelectedCountry(null);
     setPlayingChannel(null);
   }, []);
+
+  /* ── Toggle news panel ── */
+  const handleToggleNews = useCallback(() => {
+    setActiveTab((prev) => {
+      if (prev === "news") return "globe";
+      return "news";
+    });
+    setSelectedCountry(null);
+    setPlayingChannel(null);
+  }, []);
+
+  /* ── Load news channels when news tab activates ── */
+  useEffect(() => {
+    if (activeTab !== "news") return;
+    let cancelled = false;
+    setNewsLoading(true);
+    fetchNewsChannels(300, playlistChannels).then((chs) => {
+      if (!cancelled) {
+        setNewsChannels(chs);
+        setNewsLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [activeTab, playlistChannels]);
 
   /* ── Search modal channel selection ── */
   const handleSearchSelect = useCallback((channel: ChannelWithStream) => {
@@ -241,17 +270,20 @@ export default function App() {
     ? "Now Playing"
     : activeTab === "favorites"
       ? "Favorites"
-      : isPlaylistMode
-        ? "Custom Playlist"
-        : selectedCountry
-          ? "Channel Browser"
-          : "Globe Mode";
+      : activeTab === "news"
+        ? "Quick News"
+        : isPlaylistMode
+          ? "Custom Playlist"
+          : selectedCountry
+            ? "Channel Browser"
+            : "Globe Mode";
 
   /* ── Is any "right sidebar" content showing? ── */
   const hasRightContent =
-    (selectedCountry && activeTab !== "favorites" && !isPlaylistMode) ||
-    (isPlaylistMode && activeTab !== "favorites") ||
-    activeTab === "favorites";
+    (selectedCountry && activeTab !== "favorites" && activeTab !== "news" && !isPlaylistMode) ||
+    (isPlaylistMode && activeTab !== "favorites" && activeTab !== "news") ||
+    activeTab === "favorites" ||
+    activeTab === "news";
 
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden overscroll-none">
@@ -260,8 +292,8 @@ export default function App() {
       {activeTab !== 'globe' && !playingChannel && (
         <div className="fixed top-0 left-0 right-0 h-12 bg-[#0f172a] z-[99999] md:hidden" />
       )}
-      {/* ── 3D Canvas – always behind everything ── */}
-      {!isPlaylistMode && (
+      {/* ── 3D Canvas – unmounted when not visible to release GPU (battery saver) ── */}
+      {activeTab === 'globe' && !isPlaylistMode && !playingChannel && (
         <div className="absolute inset-0 z-0">
           <Scene
             onCountryClick={handleCountryClick}
@@ -269,7 +301,6 @@ export default function App() {
             rotationSpeed={globeSettings.rotationSpeed}
             atmosphereIntensity={globeSettings.atmosphereIntensity}
             focusCountryIso={focusCountryIso}
-            paused={activeTab === "search" || !!playingChannel}
           />
         </div>
       )}
@@ -281,6 +312,8 @@ export default function App() {
           onToggleNightMode={() => setIsNightMode((v) => !v)}
           showFavorites={activeTab === "favorites"}
           onToggleFavorites={handleToggleFavorites}
+          showNews={activeTab === "news"}
+          onToggleNews={handleToggleNews}
           onOpenSearch={() => setActiveTab("search")}
           onOpenSettings={() => setActiveTab("settings")}
         />
@@ -289,6 +322,9 @@ export default function App() {
       {/* ── Floating Dark-Mode Toggle (mobile only) ── */}
       {!playingChannel && (
         <button
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); setIsNightMode((v) => !v); }}
           className="absolute top-[4.5rem] right-4 z-50 md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-white/60 hover:text-cyan-400 active:scale-90 transition-all shadow-lg"
           aria-label={isNightMode ? "Switch to Day" : "Switch to Night"}
@@ -397,6 +433,22 @@ export default function App() {
               <span className="text-[9px] font-medium tracking-wide">Favorites</span>
             </button>
 
+            {/* News */}
+            <button
+              onClick={() => setActiveTab("news")}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 ${
+                activeTab === "news" ? "text-cyan-400" : "text-white/40"
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+                <path d="M18 14h-8" />
+                <path d="M15 18h-5" />
+                <path d="M10 6h8v4h-8V6Z" />
+              </svg>
+              <span className={`text-[9px] font-medium tracking-wide ${activeTab === "news" ? "font-bold" : ""}`}>News</span>
+            </button>
+
             {/* Settings */}
             <button
               onClick={() => setActiveTab("settings")}
@@ -460,6 +512,22 @@ export default function App() {
           loading={false}
           error={null}
           onPlayChannel={handlePlayChannel}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          isPlaying={!!playingChannel}
+          playingChannelId={playingChannel?.id ?? null}
+        />
+      )}
+
+      {/* ── Quick Access News Sidebar ── */}
+      {activeTab === "news" && (
+        <ChannelList
+          countryName="Quick Access News"
+          channels={newsChannels}
+          loading={newsLoading}
+          error={null}
+          onPlayChannel={handlePlayChannel}
+          onClose={() => setActiveTab("globe")}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           isPlaying={!!playingChannel}

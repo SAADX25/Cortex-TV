@@ -38,6 +38,17 @@ function StarIcon() {
   );
 }
 
+function NewsIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+      <path d="M18 14h-8" />
+      <path d="M15 18h-5" />
+      <path d="M10 6h8v4h-8V6Z" />
+    </svg>
+  );
+}
+
 /* ── Toolbar item ── */
 interface ToolButtonProps {
   icon: React.ReactNode;
@@ -67,6 +78,8 @@ interface LeftSidebarProps {
   onToggleNightMode: () => void;
   showFavorites: boolean;
   onToggleFavorites: () => void;
+  showNews: boolean;
+  onToggleNews: () => void;
   onOpenSearch: () => void;
   onOpenSettings: () => void;
 }
@@ -76,6 +89,8 @@ export default function LeftSidebar({
   onToggleNightMode,
   showFavorites,
   onToggleFavorites,
+  showNews,
+  onToggleNews,
   onOpenSearch,
   onOpenSettings,
 }: LeftSidebarProps) {
@@ -120,6 +135,15 @@ export default function LeftSidebar({
         <div className="w-5 border-t border-white/10" />
         <ToolButton icon={<SearchIcon />} label="Search" onClick={onOpenSearch} />
         <ToolButton icon={favIcon} label="Favorites" onClick={onToggleFavorites} />
+        <ToolButton
+          icon={
+            <span className={showNews ? "text-cyan-400" : ""}>
+              <NewsIcon />
+            </span>
+          }
+          label="Quick News"
+          onClick={onToggleNews}
+        />
         <ToolButton icon={<WrenchIcon />} label="Tools" />
         <div className="w-5 border-t border-white/10" />
         <ToolButton icon={<SettingsIcon />} label="Settings" onClick={onOpenSettings} />

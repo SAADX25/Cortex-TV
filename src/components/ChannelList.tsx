@@ -4,7 +4,7 @@
    are mounted – slashing DOM nodes & RAM usage.
    ────────────────────────────────────────────────── */
 
-import { useState, useCallback, useEffect, useMemo, memo } from "react";
+import { useState, useCallback, useEffect, useMemo, useDeferredValue, useRef, memo } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "../hooks/useIPTV";
 
@@ -14,6 +14,41 @@ const flagUrl = (iso: string) => {
   const code = iso.toLowerCase();
   return `https://flagcdn.com/w40/${FLAG_CODE_MAP[code] ?? code}.png`;
 };
+
+/**
+ * Regex to strip noisy tags from channel display names.
+ * Removes [Geo-blocked], [Blocked], [Geo blocked], [Not 24/7], etc.
+ */
+const STRIP_TAGS_RE = /\[geo[- ]?blocked\]|\[blocked\]|\[not 24\/7\]/gi;
+function cleanName(name: string): string {
+  return name.replace(STRIP_TAGS_RE, '').replace(/\s{2,}/g, ' ').trim();
+}
+
+/** Pulsing search icon – identical to the one in SearchModal */
+function PulsingSearchIcon({ active }: { active: boolean }) {
+  return (
+    <div className="relative shrink-0">
+      {active && (
+        <div className="absolute inset-0 -m-1.5 rounded-full bg-cyan-400/20 animate-ping" />
+      )}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className={`relative ${active ? "text-cyan-400" : "text-white/30"} transition-colors duration-300`}
+      >
+        <circle cx="11" cy="11" r="8" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
+    </div>
+  );
+}
 
 /** Fallback TV icon */
 function FallbackIcon() {
@@ -103,6 +138,8 @@ const ChannelRow = memo(function ChannelRow({
     };
   }, [ch.streamUrl]);
 
+  const displayName = cleanName(ch.name);
+
   /* Ping icon styles per status */
   const pingStyles: Record<typeof pingStatus, string> = {
     idle: "text-white/15",
@@ -123,140 +160,163 @@ const ChannelRow = memo(function ChannelRow({
         }
       }}
       aria-disabled={!ch.streamUrl}
-      className={`pointer-events-auto w-full flex items-center gap-4 md:gap-3 rounded-lg px-4 md:px-3 py-3.5 md:py-2.5 mb-1 text-left transition-colors outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50 active:scale-[0.98] ${
+      className={`group pointer-events-auto w-full rounded-xl border mb-2 text-left transition-all duration-200 outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50 active:scale-[0.98] ${
         isActive
-          ? "bg-cyan-500/15 ring-1 ring-cyan-400/30"
+          ? "bg-cyan-500/[0.08] border-cyan-400/25 shadow-[0_0_20px_rgba(0,255,255,0.06)]"
           : ch.streamUrl
-            ? "hover:bg-cyan-500/10 cursor-pointer"
-            : "opacity-40 cursor-not-allowed"
+            ? "border-white/[0.05] bg-white/[0.02] hover:border-cyan-500/20 hover:bg-cyan-500/[0.04] hover:shadow-[0_0_16px_rgba(0,255,255,0.03)] cursor-pointer"
+            : "border-white/[0.03] bg-white/[0.01] opacity-40 cursor-not-allowed"
       }`}
     >
-      {/* Flag / Logo */}
-      <div className="shrink-0 h-10 w-10 rounded-sm bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
-        {ch.country ? (
-          <img
-            src={flagUrl(ch.country)}
-            alt={ch.country}
-            width={32}
-            className="rounded-sm object-cover"
-            loading="lazy"
-            onError={(e) => {
-              const img = e.target as HTMLImageElement;
-              if (ch.logo && img.src !== ch.logo) {
-                img.src = ch.logo;
-              } else {
-                img.style.display = "none";
-                img.parentElement
-                  ?.querySelector(".fallback-icon")
+      {/* Main content */}
+      <div className="flex items-center gap-3.5 px-4 py-3">
+        {/* Flag / Logo – slightly larger with rounded corners */}
+        <div className={`shrink-0 h-11 w-11 rounded-lg border flex items-center justify-center overflow-hidden ${
+          isActive ? "border-cyan-400/20 bg-cyan-500/10" : "border-white/[0.06] bg-white/[0.04]"
+        }`}>
+          {ch.country ? (
+            <img
+              src={flagUrl(ch.country)}
+              alt={ch.country}
+              width={36}
+              className="rounded-md object-cover"
+              loading="lazy"
+              onError={(e) => {
+                const img = e.target as HTMLImageElement;
+                if (ch.logo && img.src !== ch.logo) {
+                  img.src = ch.logo;
+                } else {
+                  img.style.display = "none";
+                  img.parentElement
+                    ?.querySelector(".fallback-icon")
+                    ?.classList.remove("hidden");
+                }
+              }}
+            />
+          ) : ch.logo ? (
+            <img
+              src={ch.logo}
+              alt=""
+              className="h-full w-full object-contain p-1"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+                (e.target as HTMLImageElement)
+                  .parentElement?.querySelector(".fallback-icon")
                   ?.classList.remove("hidden");
-              }
-            }}
-          />
-        ) : ch.logo ? (
-          <img
-            src={ch.logo}
-            alt=""
-            className="h-full w-full object-contain"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = "none";
-              (e.target as HTMLImageElement)
-                .parentElement?.querySelector(".fallback-icon")
-                ?.classList.remove("hidden");
-            }}
-          />
-        ) : null}
-        <span
-          className={`fallback-icon ${
-            ch.country || ch.logo ? "hidden" : ""
-          }`}
-        >
-          <FallbackIcon />
-        </span>
-      </div>
-
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <p className={`text-sm font-medium truncate ${isActive ? "text-cyan-400" : "text-white"}`}>{ch.name}</p>
-          {isActive && (
-            <span className="shrink-0 flex items-center gap-1 text-[9px] text-cyan-400/80 font-medium uppercase tracking-wider">
-              <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_4px_rgba(0,255,255,0.6)]" />
-              LIVE
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2 mt-0.5">
-          {ch.categories.length > 0 && (
-            <span className="text-[10px] text-cyan-400/60 uppercase tracking-wider truncate">
-              {ch.categories.slice(0, 2).join(" · ")}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Stream ping status indicator */}
-      {ch.streamUrl && (
-        <span
-          className={`shrink-0 p-1 transition-all ${pingStyles[pingStatus]}`}
-          title={
-            pingStatus === "idle"
-              ? "Waiting…"
-              : pingStatus === "checking"
-                ? "Checking…"
-                : pingStatus === "online"
-                  ? "Stream is online"
-                  : "Stream is offline"
-          }
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+              }}
+            />
+          ) : null}
+          <span
+            className={`fallback-icon ${
+              ch.country || ch.logo ? "hidden" : ""
+            }`}
           >
-            {/* Activity / signal icon */}
-            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-          </svg>
-        </span>
-      )}
+            <FallbackIcon />
+          </span>
+        </div>
 
-      {/* Favorite star */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFav();
-        }}
-        className="shrink-0 p-1 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
-        title={isFav ? "Remove from favorites" : "Add to favorites"}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill={isFav ? "#22d3ee" : "none"}
-          stroke={isFav ? "#22d3ee" : "currentColor"}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={isFav ? "text-cyan-400" : "text-white/30"}
-        >
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      </button>
+        {/* Info block */}
+        <div className="min-w-0 flex-1">
+          {/* Name row */}
+          <div className="flex items-center gap-2">
+            <p className={`text-[14px] font-semibold truncate leading-tight ${
+              isActive ? "text-cyan-300" : "text-white group-hover:text-cyan-200"
+            } transition-colors duration-200`}>
+              {displayName}
+            </p>
+            {/* YouTube badge */}
+            {ch.streamUrl && (ch.streamUrl.includes("youtube.com") || ch.streamUrl.includes("youtu.be") || ch.streamUrl.includes("yt.be") || ch.streamUrl.includes("googlevideo.com")) && (
+              <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/10 border border-red-500/15">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 28.57 20"
+                  className="h-2.5 w-auto text-red-400"
+                  aria-label="YouTube"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M27.97 3.12A3.58 3.58 0 0 0 25.45.6C23.22 0 14.28 0 14.28 0S5.35 0 3.12.6A3.58 3.58 0 0 0 .6 3.12C0 5.35 0 10 0 10s0 4.65.6 6.88a3.58 3.58 0 0 0 2.52 2.52C5.35 20 14.28 20 14.28 20s8.94 0 11.17-.6a3.58 3.58 0 0 0 2.52-2.52c.6-2.23.6-6.88.6-6.88s0-4.65-.6-6.88Z"
+                  />
+                  <path fill="#fff" d="m11.43 14.28 7.44-4.28-7.44-4.28v8.56Z" />
+                </svg>
+                <span className="text-[8px] font-bold text-red-400/70 uppercase tracking-wide">YT</span>
+              </span>
+            )}
+          </div>
+          {/* Category + status row */}
+          <div className="flex items-center gap-2 mt-1">
+            {ch.categories.length > 0 && (
+              <span className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate">
+                {ch.categories.slice(0, 2).join(" · ")}
+              </span>
+            )}
+            {isActive && (
+              <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/15">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_4px_rgba(0,255,255,0.6)]" />
+                <span className="text-[8px] text-cyan-400/80 font-bold uppercase tracking-wider">Playing</span>
+              </span>
+            )}
+          </div>
+        </div>
 
-      {/* Stream indicator */}
-      {ch.streamUrl ? (
-        <div className="shrink-0 h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
-      ) : (
-        <span className="shrink-0 text-[10px] text-white/20">offline</span>
-      )}
+        {/* Right side actions */}
+        <div className="shrink-0 flex items-center gap-1.5">
+          {/* Stream ping status */}
+          {ch.streamUrl && (
+            <span
+              className={`p-1 transition-all ${pingStyles[pingStatus]}`}
+              title={
+                pingStatus === "idle"
+                  ? "Waiting…"
+                  : pingStatus === "checking"
+                    ? "Checking…"
+                    : pingStatus === "online"
+                      ? "Stream is online"
+                      : "Stream is offline"
+              }
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+              </svg>
+            </span>
+          )}
+
+          {/* Favorite star */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFav();
+            }}
+            className={`p-1.5 rounded-lg transition-all cursor-pointer active:scale-90 ${
+              isFav ? "bg-cyan-400/10 hover:bg-cyan-400/20" : "hover:bg-white/[0.06]"
+            }`}
+            title={isFav ? "Remove from favorites" : "Add to favorites"}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill={isFav ? "#22d3ee" : "none"}
+              stroke={isFav ? "#22d3ee" : "currentColor"}
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={isFav ? "text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]" : "text-white/20"}
+            >
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+          </button>
+
+          {/* Stream status dot */}
+          {ch.streamUrl ? (
+            <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] ring-2 ring-emerald-400/10" />
+          ) : (
+            <span className="text-[9px] text-white/15 font-medium uppercase tracking-wider">off</span>
+          )}
+        </div>
+      </div>
     </div>
     );
   });
@@ -274,12 +334,12 @@ export default function ChannelList({
   playingChannelId = null,
 }: ChannelListProps) {
   const [search, setSearch] = useState("");
-  /* Debounced value — filter only runs after 300 ms pause in typing */
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(search), 300);
-    return () => clearTimeout(t);
-  }, [search]);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
+  /* useDeferredValue lets React keep the input snappy while deferring
+     the expensive filter/re-render to a lower-priority update */
+  const deferredSearch = useDeferredValue(search);
+  const isStale = search !== deferredSearch;
 
   /* Build a Set for O(1) favourite lookup instead of .some() per row */
   const favSet = useMemo(
@@ -288,17 +348,16 @@ export default function ChannelList({
   );
 
   const filtered = useMemo(
-    () =>
-      debouncedSearch
-        ? channels.filter(
-            (ch) =>
-              ch.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-              ch.categories.some((c) =>
-                c.toLowerCase().includes(debouncedSearch.toLowerCase())
-              )
-          )
-        : channels,
-    [channels, debouncedSearch]
+    () => {
+      if (!deferredSearch) return channels;
+      const q = deferredSearch.toLowerCase();
+      return channels.filter(
+        (ch) =>
+          ch.name.toLowerCase().includes(q) ||
+          ch.categories.some((c) => c.toLowerCase().includes(q))
+      );
+    },
+    [channels, deferredSearch]
   );
 
   /* Row renderer for Virtuoso */
@@ -331,33 +390,86 @@ export default function ChannelList({
         " pb-24 md:pb-0"
       }
     >
-      {/* ── Header ── */}
-      <div className="flex items-center justify-between gap-3 px-5 pt-4 md:pt-4 pb-5 md:pb-4 border-b border-white/5">
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold text-white truncate">
-            {countryName}
-          </h2>
+      {/* ── Header + Search (combined glassmorphic block) ── */}
+      <div className="shrink-0 bg-gradient-to-b from-white/[0.03] to-transparent">
+        {/* Title row */}
+        <div className="flex items-center justify-between gap-3 px-5 pt-5 pb-2">
+          <div className="min-w-0 flex-1">
+            {countryName !== "Quick Access News" && countryName !== "Favorite Channels" && (
+              <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-cyan-400/50 mb-1">Browsing</p>
+            )}
+            <h2 className="text-xl font-bold text-white truncate leading-tight">
+              {countryName}
+            </h2>
+          </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="pointer-events-auto shrink-0 flex items-center justify-center h-9 w-9 rounded-xl border border-white/[0.08] bg-white/[0.04] hover:bg-white/10 text-white/40 hover:text-white transition-all cursor-pointer active:scale-90"
+              title="Close"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
         </div>
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="pointer-events-auto shrink-0 flex items-center justify-center h-10 w-10 md:h-8 md:w-8 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors cursor-pointer active:scale-95"
-            title="Close"
-          >
-            ✕
-          </button>
-        )}
-      </div>
 
-      {/* ── Search ── */}
-      <div className="px-5 py-3 border-b border-white/5">
-        <input
-          type="text"
-          placeholder="Search channels…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 md:px-3 py-3 md:py-2 text-base md:text-sm text-white placeholder-white/30 outline-none focus:border-cyan-500/40 focus:ring-1 focus:ring-cyan-500/20 transition-colors"
-        />
+        {/* Search bar — cloned from SearchModal for visual consistency */}
+        <div className="px-5 pt-3 pb-4">
+          <div
+            className={`flex relative items-center gap-3 rounded-xl border h-12 px-5 transition-all duration-300 shadow-lg ${
+              focused
+                ? "border-cyan-500/40 bg-[#1a2b4c] ring-2 ring-cyan-500/20 shadow-[0_4px_28px_rgba(0,255,255,0.12)]"
+                : "border-white/10 bg-[#1a2b4c]"
+            }`}
+          >
+            <PulsingSearchIcon active={focused || !!search} />
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="search"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="Search channels, countries…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              className="flex-1 bg-transparent text-[15px] md:text-lg text-white placeholder-white/25 outline-none font-light tracking-wide min-w-0 caret-cyan-400"
+            />
+            {/* Result badge */}
+            {search && !isStale && (
+              <span className="shrink-0 text-xs text-cyan-400/60 font-mono">
+                {filtered.length} found
+              </span>
+            )}
+            {/* Spinner while deferred */}
+            {isStale && (
+              <div className="shrink-0 h-5 w-5 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
+            )}
+            {/* Clear query button */}
+            {search && (
+              <button
+                onClick={() => { setSearch(""); inputRef.current?.focus(); }}
+                className="shrink-0 flex items-center justify-center h-9 w-9 -mr-2 rounded-full bg-white/5 hover:bg-white/10 active:bg-white/15 text-white/40 hover:text-white/80 transition-all active:scale-95 cursor-pointer"
+                aria-label="Clear search"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom separator */}
+        <div className={`h-px transition-colors duration-300 ${
+          search ? "bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent" : "bg-white/[0.04]"
+        }`} />
       </div>
 
       {/* ── Virtualised list ── */}
@@ -401,12 +513,16 @@ export default function ChannelList({
 
       {/* ── Footer stats ── */}
       {!loading && (
-        <div className="px-5 py-4 md:py-3 border-t border-white/5 text-[11px] md:text-[10px] text-white/30 flex justify-between">
-          <span>
-            {filtered.length} channel{filtered.length !== 1 ? "s" : ""}
-          </span>
-          <span>
-            {filtered.filter((c) => c.streamUrl).length} with streams
+        <div className="shrink-0 px-5 py-3.5 md:py-2.5 border-t border-white/[0.04] bg-white/[0.01] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-1.5 w-1.5 rounded-full bg-cyan-400/40" />
+            <span className="text-[11px] md:text-[10px] text-white/30 font-medium">
+              {filtered.length} channel{filtered.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <span className="flex items-center gap-1.5 text-[11px] md:text-[10px] text-emerald-400/40 font-medium">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-400/50" />
+            {filtered.filter((c) => c.streamUrl).length} live
           </span>
         </div>
       )}

@@ -10,6 +10,7 @@ import {
   preloadIPTVData,
   type ChannelWithStream,
 } from "../hooks/useIPTV";
+import { Virtuoso } from "react-virtuoso";
 
 /* ── Flag CDN helper ── */
 const FLAG_CODE_MAP: Record<string, string> = { uk: "gb" };
@@ -71,7 +72,6 @@ const GridCatIcons: Record<string, React.ReactNode> = {
 /* ── Quick-filter categories ── */
 const FILTER_CHIPS = [
   { label: "All", value: null, icon: "all" },
-  { label: "News", value: "news", icon: "news" },
   { label: "Sports", value: "sports", icon: "sports" },
   { label: "Movies", value: "movies", icon: "movies" },
   { label: "Music", value: "music", icon: "music" },
@@ -239,7 +239,7 @@ interface SearchModalProps {
   open: boolean;
   onClose: () => void;
   onSelectChannel: (channel: ChannelWithStream) => void;
-  onNavigate?: (tab: "globe" | "search" | "favorites" | "settings") => void;
+  onNavigate?: (tab: "globe" | "search" | "favorites" | "settings" | "news") => void;
 }
 
 export default function SearchModal({
@@ -256,6 +256,7 @@ export default function SearchModal({
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   /* Preload IPTV data when modal first opens */
   useEffect(() => {
@@ -483,7 +484,7 @@ export default function SearchModal({
         </div>
 
         {/* ── Results / states area ── */}
-        <div className={`flex-1 overflow-y-auto scrollbar-thin transition-all duration-500 ease-out [-webkit-overflow-scrolling:touch] ${
+        <div ref={scrollContainerRef} className={`flex-1 overflow-y-auto scrollbar-thin transition-all duration-500 ease-out [-webkit-overflow-scrolling:touch] ${
           showHint ? "md:opacity-0 md:pointer-events-none" : "mt-4 md:mt-6 opacity-100"
         }`}>
 
@@ -547,15 +548,26 @@ export default function SearchModal({
                   )}
                 </div>
 
-                {/* Mobile: compact list */}
-                <div className="md:hidden flex flex-col gap-1">
-                  {results.map((ch) => (
-                    <ResultCard
-                      key={ch.id}
-                      channel={ch}
-                      onSelect={() => handleSelect(ch)}
+                {/* Mobile: virtualised compact list (RAM saver – only visible rows mount) */}
+                <div className="md:hidden">
+                  {scrollContainerRef.current && (
+                    <Virtuoso
+                      customScrollParent={scrollContainerRef.current}
+                      totalCount={results.length}
+                      overscan={300}
+                      itemContent={(index) => {
+                        const ch = results[index];
+                        return (
+                          <div className="mb-1">
+                            <ResultCard
+                              channel={ch}
+                              onSelect={() => handleSelect(ch)}
+                            />
+                          </div>
+                        );
+                      }}
                     />
-                  ))}
+                  )}
                 </div>
 
                 {/* Desktop: card grid */}
@@ -611,6 +623,20 @@ export default function SearchModal({
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                 </svg>
                 <span className="text-[9px] font-medium tracking-wide">Favorites</span>
+              </button>
+
+              {/* News */}
+              <button
+                onClick={() => onNavigate?.("news")}
+                className="flex-1 flex flex-col items-center justify-center gap-0.5 text-white/40 active:text-white/60 active:scale-95 transition-all cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+                  <path d="M18 14h-8" />
+                  <path d="M15 18h-5" />
+                  <path d="M10 6h8v4h-8V6Z" />
+                </svg>
+                <span className="text-[9px] font-medium tracking-wide">News</span>
               </button>
 
               {/* Settings */}

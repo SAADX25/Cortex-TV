@@ -6,12 +6,163 @@
 
 import { useRef, useEffect, useState, useCallback } from "react";
 import Hls from "hls.js";
+import { Capacitor } from "@capacitor/core";
 import type { ChannelWithStream } from "../hooks/useIPTV";
 import { resolveStream } from "../utils/StreamResolver";
 
 interface PlayerProps {
   channel: ChannelWithStream;
   onClose: () => void;
+}
+
+/*
+ * ── Browser proxy URL rewriter ──
+ * In a standard browser (non-Electron) hls.js cannot spoof Referer/Origin,
+ * so CDNs like hibridcdn.net return 403.  We route those requests through
+ * the Vite dev-server proxy which injects the correct headers server-side.
+ *
+ * In Electron the main-process request interceptor handles this, so we
+ * leave the URL untouched.
+ */
+const IS_ELECTRON = typeof navigator !== "undefined" &&
+  navigator.userAgent.toLowerCase().includes("electron");
+
+const IS_NATIVE = Capacitor.isNativePlatform(); // true on Android/iOS APK
+
+const PROXY_RULES: Array<{ match: RegExp; prefix: string; strip: string }> = [
+  // rotana.hibridcdn.net  → /proxy/rotana
+  { match: /https?:\/\/rotana\.hibridcdn\.net/i, prefix: "/proxy/rotana", strip: "rotana.hibridcdn.net" },
+  // mbc.dbrsp.net         → /proxy/mbc
+  { match: /https?:\/\/mbc\.dbrsp\.net/i,        prefix: "/proxy/mbc",    strip: "mbc.dbrsp.net" },
+];
+
+/*
+ * ── Cloudflare Worker proxy for production / native builds ──
+ * After deploying the Worker in cloudflare-worker/, paste your URL here.
+ * The Worker accepts ?url=<encoded> and forwards with spoofed headers.
+ *
+ *   Free tier: 100 000 requests/day – more than enough for personal use.
+ */
+const CLOUD_PROXY = 'https://cortextv-proxy.cortextv-sr.workers.dev/?url=';
+
+/**
+ * CDN hostname fragments that require header spoofing via the
+ * Cloudflare Worker.  Only these domains get proxied on Android;
+ * everything else is fetched directly by hls.js so we don't break
+ * standard streams by injecting unexpected headers.
+ *
+ * Keep in sync with HEADER_MAP in cloudflare-worker/worker.js.
+ */
+const PROXY_CDN_FRAGMENTS = [
+  'hibridcdn.net',
+  'dbrsp.net',
+  'cloudfront.net',
+];
+
+/**
+ * Returns true when `url` matches a known blocked CDN (Vite proxy list).
+ */
+function matchesProxyRule(url: string): boolean {
+  return PROXY_RULES.some((rule) => rule.match.test(url));
+}
+
+/**
+ * Returns true when the URL points to a CDN that requires header
+ * spoofing / CORS bypassing via the Cloudflare Worker.
+ *
+ * Only domains listed in PROXY_CDN_FRAGMENTS are proxied.
+ * Standard streams are left alone so hls.js can fetch them directly.
+ */
+function needsCloudProxy(url: string): boolean {
+  if (!url || url.startsWith('data:') || url.startsWith('blob:')) return false;
+  // Never double-proxy
+  if (url.includes('cortextv-proxy') && url.includes('workers.dev')) return false;
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return PROXY_CDN_FRAGMENTS.some((frag) => hostname.includes(frag));
+  } catch {
+    return false;
+  }
+}
+
+function proxyRewrite(url: string): string {
+  if (IS_ELECTRON) return url;                       // Electron handles headers itself
+
+  if (IS_NATIVE) {
+    // Android APK — only route known blocked CDNs through Cloudflare Worker
+    if (needsCloudProxy(url)) {
+      const proxied = CLOUD_PROXY + encodeURIComponent(url);
+      console.log(`[Player] Cloud proxy: ${url} → ${proxied}`);
+      return proxied;
+    }
+    return url;
+  }
+
+  // Local dev server — use Vite proxy for known CDNs
+  for (const rule of PROXY_RULES) {
+    if (rule.match.test(url)) {
+      const absolute = window.location.origin + rule.prefix;
+      const rewritten = url.replace(new RegExp(`https?://${rule.strip}`, "i"), absolute);
+      console.log(`[Player] Vite proxy: ${url} → ${rewritten}`);
+      return rewritten;
+    }
+  }
+  return url;
+}
+
+/*
+ * ── Custom HLS.js loader for native Android ──
+ * Proxies all cross-origin requests through the Cloudflare Worker,
+ * and crucially reports the ORIGINAL CDN URL as the response URL.
+ *
+ * Why?  HLS.js resolves relative URLs in playlists against the URL
+ * the playlist was loaded from.  If that URL is the Worker URL
+ * (workers.dev/?url=…), relative paths like "720p/index.m3u8"
+ * resolve to "workers.dev/720p/index.m3u8" (broken!).
+ *
+ * By overriding response.url → real CDN URL, HLS.js resolves
+ * "720p/index.m3u8" → "cdn.example.com/live/720p/index.m3u8" (correct).
+ * The loader then proxies that correct CDN URL through the Worker.
+ */
+function createNativeProxyLoader(debugFn?: (msg: string) => void) {
+  const DefaultLoader = Hls.DefaultConfig.loader;
+
+  return class NativeProxyLoader extends DefaultLoader {
+    load(context: any, config: any, callbacks: any) {
+      let cdnUrl: string = context.url;
+
+      // ── Step 1: un-wrap an already-proxied URL to recover the real CDN URL ──
+      if (cdnUrl.startsWith(CLOUD_PROXY)) {
+        try {
+          cdnUrl = decodeURIComponent(cdnUrl.slice(CLOUD_PROXY.length));
+          debugFn?.(`🔓 Unwrapped proxy → ${cdnUrl.substring(0, 90)}`);
+        } catch { /* keep original */ }
+      }
+
+      const realCdnUrl = cdnUrl;
+
+      // ── Step 2: wrap cross-origin URLs in the Cloudflare Worker proxy ──
+      if (needsCloudProxy(cdnUrl)) {
+        context.url = CLOUD_PROXY + encodeURIComponent(cdnUrl);
+        debugFn?.(`📡 Proxy load: ${cdnUrl.substring(0, 70)}`);
+      }
+
+      // ── Step 3: intercept onSuccess to report the real CDN URL ──
+      const originalOnSuccess = callbacks.onSuccess;
+      callbacks.onSuccess = (
+        response: any,
+        stats: any,
+        ctx: any,
+        networkDetails: any
+      ) => {
+        // Tell HLS.js this response came from the CDN, not the Worker
+        response.url = realCdnUrl;
+        originalOnSuccess(response, stats, ctx, networkDetails);
+      };
+
+      super.load(context, config, callbacks);
+    }
+  };
 }
 
 type StreamStatus = "loading" | "playing" | "error";
@@ -109,7 +260,18 @@ export default function Player({ channel, onClose }: PlayerProps) {
   const [retryCount, setRetryCount] = useState(0);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
+  const [nativeFallback, setNativeFallback] = useState(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [showDebug, setShowDebug] = useState(false);
   const MAX_RETRIES = 2;
+
+  /** Append a timestamped line to the on-screen debug log */
+  const addDebugLine = useCallback((msg: string) => {
+    const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+    const line = `[${ts}] ${msg}`;
+    console.log(`[Player-Debug] ${msg}`);
+    setDebugLog((prev) => [...prev.slice(-40), line]);
+  }, []);
 
   /* ── Mobile-device flag (stable across rotations — uses shortest screen edge) ── */
   const [isMobile] = useState(
@@ -127,6 +289,7 @@ export default function Player({ channel, onClose }: PlayerProps) {
     setStatus("loading");
     setErrorMsg("");
     setErrorTitle("");
+    setNativeFallback(false);   // reset fallback on manual retry
   }, []);
 
   /* ── Orientation listener ── */
@@ -147,24 +310,39 @@ export default function Player({ channel, onClose }: PlayerProps) {
   useEffect(() => {
     if (!channel.streamUrl) {
       setResolvedUrl(null);
+      addDebugLine(`❌ No streamUrl for channel "${channel.name}"`);
       return;
     }
 
     let cancelled = false;
     setResolving(true);
     setResolvedUrl(null);
+    addDebugLine(`🔍 Resolving: ${channel.streamUrl}`);
+    addDebugLine(`📱 Platform: IS_NATIVE=${IS_NATIVE}, IS_ELECTRON=${IS_ELECTRON}`);
+    addDebugLine(`🌐 HLS.js supported: ${Hls.isSupported()}`);
+
+    // Quick connectivity test for the Cloudflare Worker (native only)
+    if (IS_NATIVE) {
+      fetch(CLOUD_PROXY + encodeURIComponent('https://httpbin.org/get'), { method: 'HEAD', mode: 'no-cors' })
+        .then(() => addDebugLine('☁️ CF Worker reachable'))
+        .catch((e) => addDebugLine(`☁️ CF Worker UNREACHABLE: ${e.message}`));
+    }
 
     resolveStream(channel.streamUrl)
       .then((url) => {
         if (!cancelled) {
-          setResolvedUrl(url);
+          const rewritten = proxyRewrite(url);
+          addDebugLine(`✅ Resolved → ${url.substring(0, 80)}…`);
+          if (rewritten !== url) addDebugLine(`🔄 Proxy rewrite → ${rewritten.substring(0, 80)}…`);
+          setResolvedUrl(rewritten);
           setResolving(false);
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!cancelled) {
-          /* Fallback: use the original URL if resolution fails */
-          setResolvedUrl(channel.streamUrl!);
+          addDebugLine(`⚠️ Resolve failed: ${err.message} — using original`);
+          const rewritten = proxyRewrite(channel.streamUrl!);
+          setResolvedUrl(rewritten);
           setResolving(false);
         }
       });
@@ -189,31 +367,148 @@ export default function Player({ channel, onClose }: PlayerProps) {
     let hls: Hls | null = null;
     let networkRetryTimer: ReturnType<typeof setTimeout> | null = null;
 
-    if (Hls.isSupported()) {
-      hls = new Hls({
+    /* ─────────────────────────────────────────────────────────────
+       PATH A – Native <video> fallback
+       Used when HLS.js already failed, or when HLS.js isn't supported
+       but the browser can play HLS/MP4 natively (Safari, iOS, many
+       Android WebViews).
+       ───────────────────────────────────────────────────────────── */
+    if (nativeFallback || !Hls.isSupported()) {
+      console.log(
+        `[Player] Using native <video> playback${nativeFallback ? " (HLS.js fallback)" : ""}`
+      );
+      addDebugLine(`▶ Native <video> playback${nativeFallback ? " (HLS.js fallback)" : ""}`);
+
+      video.src = resolvedUrl;
+
+      const onLoadedMeta = () => {
+        video.play().catch(() => setStatus("playing"));
+      };
+      const onNativeError = () => {
+        setErrorTitle("Playback Failed");
+        setErrorMsg(
+          nativeFallback
+            ? "Both HLS.js and native playback failed. The stream may be offline or geo-blocked."
+            : "Native HLS playback is not supported for this stream."
+        );
+        setStatus("error");
+      };
+
+      video.addEventListener("loadedmetadata", onLoadedMeta);
+      video.addEventListener("error", onNativeError);
+
+      /* Timeout: if native player can't connect in 15 s, treat as dead */
+      const timeout = setTimeout(() => {
+        setStatus((s) => {
+          if (s === "loading") {
+            setErrorTitle("Connection Timed Out");
+            setErrorMsg(
+              "The stream server did not respond. It may be offline or geo-blocked."
+            );
+            return "error";
+          }
+          return s;
+        });
+      }, 15000);
+
+      return () => {
+        clearTimeout(timeout);
+        video.removeEventListener("loadedmetadata", onLoadedMeta);
+        video.removeEventListener("error", onNativeError);
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      };
+    }
+
+    /* ─────────────────────────────────────────────────────────────
+       PATH B – HLS.js  (primary path)
+       On fatal failure, falls back to PATH A via setNativeFallback(true)
+       ───────────────────────────────────────────────────────────── */
+
+    /**
+     * Trigger native-video fallback instead of an immediate error state.
+     * This gives streams a second chance when HLS.js can't handle them
+     * (common CORS / codec issues on some providers).
+     */
+    const fallbackOrError = (title: string, msg: string) => {
+      if (!nativeFallback) {
+        console.warn("[Player] HLS.js fatal — falling back to native <video>…");
+        setNativeFallback(true);
+        setStatus("loading");
+      } else {
+        setErrorTitle(title);
+        setErrorMsg(msg);
+        setStatus("error");
+      }
+    };
+
+    hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
         /* ── Thermal / memory tuning ── */
         maxBufferLength: 30,          // keep at most 30 s of buffer in RAM
-        maxMaxBufferLength: 60,       // hard ceiling – never exceed 60 s
+        maxMaxBufferLength: 30,       // hard ceiling – cap at 30 s to save battery & network
         maxBufferSize: 30 * 1000 * 1000, // ~30 MB source buffer cap
         fragLoadingMaxRetry: 5,
         manifestLoadingMaxRetry: 4,
         levelLoadingMaxRetry: 4,
         fragLoadingMaxRetryTimeout: 4000,
         manifestLoadingMaxRetryTimeout: 4000,
-        xhrSetup: (xhr, _url) => {
-          /* Allow cross-origin cookies / credentials if needed */
+
+        /*
+         * ── Native Android: custom loader handles ALL proxying ──
+         * This ensures response.url reports the REAL CDN URL so
+         * HLS.js resolves relative playlist / segment paths against
+         * the CDN origin, not the Cloudflare Worker domain.
+         */
+        ...(IS_NATIVE
+          ? { loader: createNativeProxyLoader(addDebugLine) as any }
+          : {}),
+
+        xhrSetup: (xhr, url) => {
           xhr.withCredentials = false;
+
           /*
-           * Spoof headers to bypass basic server-side blocking
-           * (e.g. eighty-eight.watch checking User-Agent / Referer).
-           * In standard browsers these are forbidden headers, but
-           * Electron with webSecurity disabled allows overriding them.
+           * Native Android: the NativeProxyLoader already rewrote
+           * context.url → Worker proxy URL.  Nothing else to do.
            */
-          xhr.setRequestHeader('User-Agent', 'VLC/3.0.16 LibVLC/3.0.16');
-          xhr.setRequestHeader('Referer', 'https://tv.eighty-eight.website/');
-          xhr.setRequestHeader('Origin', 'https://tv.eighty-eight.website');
+          if (IS_NATIVE) return;
+
+          /*
+           * ── Browser proxy rewrite for EVERY sub-request ──
+           * The initial .m3u8 goes through proxyRewrite(), but the
+           * manifest contains absolute CDN URLs for variant playlists
+           * and .ts chunks that hls.js fetches directly.  We intercept
+           * every XHR here and re-open with the proxied URL so ALL
+           * requests go through the Vite dev-server proxy.
+           */
+          if (!IS_ELECTRON) {
+            let rewritten: string | null = null;
+            for (const rule of PROXY_RULES) {
+              if (rule.match.test(url)) {
+                rewritten = url.replace(
+                  new RegExp(`https?://${rule.strip}`, "i"),
+                  window.location.origin + rule.prefix
+                );
+                break;
+              }
+            }
+            if (rewritten) {
+              xhr.open("GET", rewritten, true);
+              return;                        // skip Origin/Referer — proxy handles them
+            }
+          }
+
+          /*
+           * Electron path: set Origin / Referer to match stream host.
+           * (User-Agent is handled by the main-process interceptor.)
+           */
+          try {
+            const streamOrigin = new URL(url).origin;
+            xhr.setRequestHeader('Origin', streamOrigin);
+            xhr.setRequestHeader('Referer', streamOrigin + '/');
+          } catch { /* malformed URL – skip */ }
         },
       });
       hlsRef.current = hls;
@@ -223,6 +518,7 @@ export default function Player({ channel, onClose }: PlayerProps) {
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         console.log("[Player] HLS manifest parsed, starting playback…");
+        addDebugLine("✅ HLS manifest parsed — starting playback");
         video.play().catch((e) => {
           console.warn("[Player] Auto-play blocked:", e.message);
           setStatus("playing");
@@ -240,6 +536,7 @@ export default function Player({ channel, onClose }: PlayerProps) {
           data.details,
           data.fatal ? "(FATAL)" : ""
         );
+        addDebugLine(`🔴 HLS ${data.fatal ? 'FATAL' : 'warn'}: ${data.type} / ${data.details}`);
 
         if (data.fatal) {
           const errorInfo = categoriseError(data.details, channel.country);
@@ -253,9 +550,7 @@ export default function Player({ channel, onClose }: PlayerProps) {
               networkRetryTimer = setTimeout(() => {
                 setStatus((s) => {
                   if (s !== "playing") {
-                    setErrorTitle(errorInfo.title);
-                    setErrorMsg(errorInfo.message);
-                    return "error";
+                    fallbackOrError(errorInfo.title, errorInfo.message);
                   }
                   return s;
                 });
@@ -270,11 +565,10 @@ export default function Player({ channel, onClose }: PlayerProps) {
               setTimeout(() => {
                 setStatus((s) => {
                   if (s !== "playing") {
-                    setErrorTitle("Media Decode Error");
-                    setErrorMsg(
+                    fallbackOrError(
+                      "Media Decode Error",
                       "The stream format is incompatible or corrupted. Try a different channel."
                     );
-                    return "error";
                   }
                   return s;
                 });
@@ -282,29 +576,12 @@ export default function Player({ channel, onClose }: PlayerProps) {
               break;
 
             default:
-              setErrorTitle(errorInfo.title);
-              setErrorMsg(errorInfo.message);
-              setStatus("error");
+              fallbackOrError(errorInfo.title, errorInfo.message);
               hls?.destroy();
               break;
           }
         }
       });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = resolvedUrl;
-      video.addEventListener("loadedmetadata", () => {
-        video.play().catch(() => setStatus("playing"));
-      });
-      video.addEventListener("error", () => {
-        setErrorTitle("Playback Failed");
-        setErrorMsg("Native HLS playback failed for this stream.");
-        setStatus("error");
-      });
-    } else {
-      setErrorTitle("Unsupported Browser");
-      setErrorMsg("HLS playback is not supported in this environment.");
-      setStatus("error");
-    }
 
     /* Timeout: if still loading after 15s, treat as offline */
     const timeout = setTimeout(() => {
@@ -339,7 +616,7 @@ export default function Player({ channel, onClose }: PlayerProps) {
         video.load();        // forces browser to release media buffers
       }
     };
-  }, [resolvedUrl, retryCount, isMobile]);
+  }, [resolvedUrl, retryCount, isMobile, nativeFallback]);
 
   /* Mark playing once actual video frames render */
   const handlePlaying = () => setStatus("playing");
@@ -457,6 +734,23 @@ export default function Player({ channel, onClose }: PlayerProps) {
             playsInline
             onPlaying={handlePlaying}
           />
+
+          {/* ── Debug overlay (mobile) ── */}
+          <button
+            onClick={() => setShowDebug((p) => !p)}
+            className="absolute bottom-2 right-2 z-[20] bg-black/70 text-[9px] text-yellow-400 px-2 py-1 rounded border border-yellow-500/30"
+          >
+            {showDebug ? "Hide Log" : "🐛 Debug"}
+          </button>
+          {showDebug && (
+            <div className="absolute inset-x-0 bottom-8 z-[20] max-h-[40%] overflow-y-auto bg-black/90 border-t border-yellow-500/30 p-2">
+              {debugLog.length === 0 ? (
+                <p className="text-[9px] text-white/30">No log entries yet…</p>
+              ) : debugLog.map((line, i) => (
+                <p key={i} className="text-[9px] text-green-400/80 font-mono leading-relaxed">{line}</p>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ── Control bar beneath video ── */}
