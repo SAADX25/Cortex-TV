@@ -104,37 +104,44 @@ const ChannelRow = memo(function ChannelRow({
     "idle" | "checking" | "online" | "offline"
   >("idle");
 
-  /* ── Auto-ping on mount (safe with virtuoso — only visible rows mount) ── */
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  /* ── Debounced auto-ping (waits 500ms after mount before firing) ──
+     During fast scrolling, rows mount and unmount rapidly. The delay
+     ensures we only ping streams the user actually stops and looks at,
+     eliminating hundreds of burst network requests on mid-range phones. */
   useEffect(() => {
     if (!ch.streamUrl) return;
     const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let networkTimer: ReturnType<typeof setTimeout> | null = null;
 
-    setPingStatus("checking");
+    /* Wait 500ms before initiating the ping — if the row scrolls
+       off-screen before then, the cleanup cancels everything. */
+    const debounce = setTimeout(() => {
+      setPingStatus("checking");
 
-    (async () => {
-      try {
-        timer = setTimeout(() => controller.abort(), 8000);
-        const res = await fetch(ch.streamUrl!, {
-          method: "GET",
-          mode: "no-cors",
-          signal: controller.signal,
-        });
-        if (timer) clearTimeout(timer);
-        if (!controller.signal.aborted) {
-          setPingStatus(res.status < 400 || res.type === "opaque" ? "online" : "offline");
+      (async () => {
+        try {
+          networkTimer = setTimeout(() => controller.abort(), 8000);
+          const res = await fetch(ch.streamUrl!, {
+            method: "GET",
+            mode: "no-cors",
+            signal: controller.signal,
+          });
+          if (networkTimer) clearTimeout(networkTimer);
+          if (!controller.signal.aborted) {
+            setPingStatus(res.status < 400 || res.type === "opaque" ? "online" : "offline");
+          }
+        } catch {
+          if (!controller.signal.aborted) {
+            setPingStatus("offline");
+          }
         }
-      } catch {
-        if (!controller.signal.aborted) {
-          setPingStatus("offline");
-        }
-      }
-    })();
+      })();
+    }, 500);
 
     return () => {
+      clearTimeout(debounce);
       controller.abort();
-      if (timer) clearTimeout(timer);
+      if (networkTimer) clearTimeout(networkTimer);
     };
   }, [ch.streamUrl]);
 
@@ -360,10 +367,17 @@ export default function ChannelList({
     [channels, deferredSearch]
   );
 
-  /* Row renderer for Virtuoso */
+  /* Stable ref for filtered list — prevents renderRow identity from
+     changing on every keystroke, so Virtuoso can skip re-renders of
+     rows whose data hasn't actually changed. */
+  const filteredRef = useRef(filtered);
+  filteredRef.current = filtered;
+
+  /* Row renderer for Virtuoso (stable identity via ref) */
   const renderRow = useCallback(
     (index: number) => {
-      const ch = filtered[index];
+      const ch = filteredRef.current[index];
+      if (!ch) return null;
       return (
         <ChannelRow
           ch={ch}
@@ -374,7 +388,7 @@ export default function ChannelList({
         />
       );
     },
-    [filtered, favSet, playingChannelId, onPlayChannel, onToggleFavorite]
+    [favSet, playingChannelId, onPlayChannel, onToggleFavorite]
   );
 
   /* Empty / loading / error states shown inside the Virtuoso area */
@@ -504,7 +518,7 @@ export default function ChannelList({
           <Virtuoso
             totalCount={filtered.length}
             itemContent={renderRow}
-            overscan={200}
+            overscan={{ main: 300, reverse: 100 }}
             className="scrollbar-thin"
             style={{ height: "100%", padding: "8px 12px" }}
           />

@@ -1,12 +1,26 @@
 /* ──────────────────────────────────────────────────
    useIPTV.ts – Fetches and filters IPTV channels
    from the free iptv-org API by country ISO code.
+   
+   All heavy processing (indexing, filtering, sorting,
+   searching) is offloaded to a Web Worker via the
+   iptvWorkerClient adapter. The main thread only
+   performs network fetches and trivial ISO expansion.
    ────────────────────────────────────────────────── */
 
 import { useEffect, useState, useRef } from "react";
+import {
+  ensureWorkerData,
+  filterByCountry,
+  processFallbackChannels,
+} from "../workers/iptvWorkerClient";
 
-const CHANNELS_URL = "https://iptv-org.github.io/api/channels.json";
-const STREAMS_URL = "https://iptv-org.github.io/api/streams.json";
+/* ── Re-export worker-delegated functions (preserves all consumer imports) ── */
+export {
+  searchAllChannels,
+  fetchNewsChannels,
+  preloadIPTVData,
+} from "../workers/iptvWorkerClient";
 
 /* ── ISO alias map for countries whose GeoJSON code differs from iptv-org ── */
 const ISO_ALIASES: Record<string, string[]> = {
@@ -86,187 +100,11 @@ interface UseIPTVReturn {
   error: string | null;
 }
 
-/* ── Singleton cache so we only fetch the big JSON files once ── */
-let channelCache: Channel[] | null = null;
-let streamCache: Map<string, Stream> | null = null;
-let fetchPromise: Promise<void> | null = null;
-
-async function ensureData(): Promise<void> {
-  if (channelCache && streamCache) return;
-  if (fetchPromise) return fetchPromise;
-
-  fetchPromise = (async () => {
-    console.log("[IPTV] Fetching channels + streams from iptv-org API…");
-
-    const [chRes, stRes] = await Promise.all([
-      fetch(CHANNELS_URL),
-      fetch(STREAMS_URL),
-    ]);
-
-    if (!chRes.ok) throw new Error(`Channels API: HTTP ${chRes.status}`);
-    if (!stRes.ok) throw new Error(`Streams API: HTTP ${stRes.status}`);
-
-    const rawChannels: any[] = await chRes.json();
-    const rawStreams: any[] = await stRes.json();
-
-    /* Map channels */
-    channelCache = rawChannels.map((c) => ({
-      id: c.id ?? "",
-      name: c.name ?? "Unknown",
-      logo: c.logo || null,
-      country: (c.country ?? "").toUpperCase(),
-      categories: c.categories ?? [],
-      languages: c.languages ?? [],
-      website: c.website || null,
-      isNsfw: c.is_nsfw ?? false,
-    }));
-
-    /* Map streams – keep only the first working stream per channel */
-    streamCache = new Map();
-    for (const s of rawStreams) {
-      if (!s.channel || streamCache.has(s.channel)) continue;
-      streamCache.set(s.channel, {
-        channel: s.channel,
-        url: s.url ?? "",
-        status: s.status ?? "unknown",
-      });
-    }
-
-    console.log(
-      `[IPTV] Cached ${channelCache.length} channels, ${streamCache.size} streams`
-    );
-  })();
-
-  return fetchPromise;
-}
-
-/* ── Global search (used by SearchModal) ── */
-
-/** Normalised search terms so "uk" also matches country code "GB" etc. */
-const SEARCH_ALIASES: Record<string, string[]> = {
-  uk: ["uk", "gb"],
-  gb: ["uk", "gb"],
-  "united kingdom": ["uk", "gb"],
-  fr: ["fr"],
-  fra: ["fr"],
-  france: ["fr"],
-};
-
-export async function searchAllChannels(
-  query: string,
-  limit = 80,
-  categoryFilter?: string | null
-): Promise<ChannelWithStream[]> {
-  await ensureData();
-  if (!channelCache || !streamCache) return [];
-  const q = query.toLowerCase().trim();
-  const cat = categoryFilter?.toLowerCase() ?? null;
-
-  /* If no query AND no category filter, return nothing */
-  if (!q && !cat) return [];
-
-  /* Expand query for country-code aliases ("uk" → ["uk","gb"]) */
-  const countryAliases = SEARCH_ALIASES[q] ?? null;
-
-  const results: ChannelWithStream[] = [];
-  for (const ch of channelCache) {
-    if (ch.isNsfw) continue;
-
-    /* Category filter (when active) */
-    if (cat && !ch.categories.some((c) => c.toLowerCase() === cat)) continue;
-
-    /* Text query (when provided) */
-    if (q) {
-      const chCountry = ch.country.toLowerCase();
-      const matches =
-        ch.name.toLowerCase().includes(q) ||
-        ch.categories.some((c) => c.toLowerCase().includes(q)) ||
-        chCountry === q ||
-        (countryAliases !== null && countryAliases.includes(chCountry));
-      if (!matches) continue;
-    }
-
-    results.push({
-      ...ch,
-      streamUrl: streamCache.get(ch.id)?.url ?? null,
-    });
-    if (results.length >= limit) break;
-  }
-  /* Channels with streams first */
-  return results.sort((a, b) => {
-    if (a.streamUrl && !b.streamUrl) return -1;
-    if (!a.streamUrl && b.streamUrl) return 1;
-    return a.name.localeCompare(b.name);
-  });
-}
-
-/* ── Preload data (called on app startup) ── */
-export function preloadIPTVData(): void {
-  ensureData().catch(() => {});
-}
-
-/* ── Quick Access News: fetch all channels with NEWS category/name ── */
-export async function fetchNewsChannels(
-  limit = 300,
-  extraPlaylistChannels?: ChannelWithStream[]
-): Promise<ChannelWithStream[]> {
-  await ensureData();
-  if (!channelCache || !streamCache) return extraPlaylistChannels ?? [];
-
-  const results: ChannelWithStream[] = [];
-  const seenIds = new Set<string>();
-
-  /* 1) Include playlist channels that are YouTube-sourced or have NEWS in category/name */
-  if (extraPlaylistChannels) {
-    for (const ch of extraPlaylistChannels) {
-      const isYouTube =
-        ch.streamUrl &&
-        (ch.streamUrl.includes("youtube.com") ||
-          ch.streamUrl.includes("youtu.be") ||
-          ch.streamUrl.includes("yt.be") ||
-          ch.streamUrl.includes("googlevideo.com"));
-      const isNews =
-        ch.categories.some((c) => c.toLowerCase().includes("news")) ||
-        ch.name.toLowerCase().includes("news");
-      if (isYouTube || isNews) {
-        results.push(ch);
-        seenIds.add(ch.id);
-      }
-    }
-  }
-
-  /* 2) IPTV-org channels with NEWS category or name */
-  for (const ch of channelCache) {
-    if (ch.isNsfw) continue;
-    if (seenIds.has(ch.id)) continue;
-
-    const isNews =
-      ch.categories.some((c) => c.toLowerCase().includes("news")) ||
-      ch.name.toLowerCase().includes("news");
-    if (!isNews) continue;
-
-    results.push({
-      ...ch,
-      streamUrl: streamCache.get(ch.id)?.url ?? null,
-    });
-    seenIds.add(ch.id);
-    if (results.length >= limit) break;
-  }
-
-  /* Channels with streams first, then alphabetical */
-  return results.sort((a, b) => {
-    if (a.streamUrl && !b.streamUrl) return -1;
-    if (!a.streamUrl && b.streamUrl) return 1;
-    return a.name.localeCompare(b.name);
-  });
-}
-
-/* ── Country-endpoint fallback (works for any country) ── */
+/* ── Country-endpoint fallback (fetch on main thread, process in worker) ── */
 function fetchCountryFallback(
   isoCode: string,
   token: number,
   abortRef: React.MutableRefObject<number>,
-  streams: Map<string, Stream> | null,
   setChannels: React.Dispatch<React.SetStateAction<ChannelWithStream[]>>,
   setLoading: React.Dispatch<React.SetStateAction<boolean>>
 ) {
@@ -280,24 +118,9 @@ function fetchCountryFallback(
       const raw: any[] = await res.json();
       if (token !== abortRef.current) return;
 
-      const mapped: ChannelWithStream[] = raw
-        .filter((c: any) => !c.is_nsfw)
-        .map((c: any) => ({
-          id: c.id ?? "",
-          name: c.name ?? "Unknown",
-          logo: c.logo || null,
-          country: (c.country ?? "").toUpperCase(),
-          categories: c.categories ?? [],
-          languages: c.languages ?? [],
-          website: c.website || null,
-          isNsfw: false,
-          streamUrl: streams?.get(c.id ?? "")?.url ?? null,
-        }))
-        .sort((a: ChannelWithStream, b: ChannelWithStream) => {
-          if (a.streamUrl && !b.streamUrl) return -1;
-          if (!a.streamUrl && b.streamUrl) return 1;
-          return a.name.localeCompare(b.name);
-        });
+      /* Offload mapping + sorting to the worker */
+      const mapped = await processFallbackChannels(raw);
+      if (token !== abortRef.current) return;
 
       setChannels(mapped);
       setLoading(false);
@@ -331,24 +154,17 @@ export function useIPTV(countryIso: string | null): UseIPTVReturn {
     setLoading(true);
     setError(null);
 
-    const isoSet = new Set(expandIso(countryIso));
+    /* Expand ISO on main thread (trivial string lookup) */
+    const countryCodes = expandIso(countryIso);
 
-    ensureData()
-      .then(() => {
+    /* Ensure data is fetched (main thread) and indexed (worker) */
+    ensureWorkerData()
+      .then(async () => {
         if (token !== abortRef.current) return; // stale
 
-        const filtered = (channelCache ?? [])
-          .filter((ch) => isoSet.has(ch.country) && !ch.isNsfw)
-          .map<ChannelWithStream>((ch) => ({
-            ...ch,
-            streamUrl: streamCache?.get(ch.id)?.url ?? null,
-          }))
-          /* Channels with a stream bubble to the top */
-          .sort((a, b) => {
-            if (a.streamUrl && !b.streamUrl) return -1;
-            if (!a.streamUrl && b.streamUrl) return 1;
-            return a.name.localeCompare(b.name);
-          });
+        /* O(1) lookup via the worker's inverted country index */
+        const filtered = await filterByCountry(countryCodes);
+        if (token !== abortRef.current) return; // stale
 
         /* ── Fallback: If 0 channels found, try the country-specific endpoint ── */
         if (filtered.length === 0) {
@@ -358,14 +174,14 @@ export function useIPTV(countryIso: string | null): UseIPTVReturn {
             ISO_CANONICAL[upper] ??
             (byName ? ISO_CANONICAL[byName] ?? byName.toLowerCase() : null) ??
             countryIso.toLowerCase();
-          fetchCountryFallback(canonical, token, abortRef, streamCache, setChannels, setLoading);
+          fetchCountryFallback(canonical, token, abortRef, setChannels, setLoading);
           return;
         }
 
         setChannels(filtered);
         setLoading(false);
         console.log(
-          `[IPTV] ${filtered.length} channels for [${[...isoSet].join(",")}] (${filtered.filter((c) => c.streamUrl).length} with streams)`
+          `[IPTV] ${filtered.length} channels for [${countryCodes.join(",")}] (${filtered.filter((c) => c.streamUrl).length} with streams)`
         );
       })
       .catch((err) => {

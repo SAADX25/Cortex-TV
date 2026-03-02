@@ -105,8 +105,159 @@ const COUNTRY_TZ: Record<string, string> = {
   UA:"Europe/Kiev",AE:"Asia/Dubai",GB:"Europe/London",US:"America/New_York",
   UY:"America/Montevideo",UZ:"Asia/Tashkent",VU:"Pacific/Efate",VE:"America/Caracas",
   VN:"Asia/Ho_Chi_Minh",YE:"Asia/Aden",ZM:"Africa/Lusaka",ZW:"Africa/Harare",
-  PS:"Asia/Hebron",XK:"Europe/Belgrade",
+  PS:"Asia/Hebron",XK:"Europe/Belgrade",EH:"Africa/El_Aaiun",
 };
+
+/* ── ISO-A2 → Capital city name ── */
+const COUNTRY_CAPITAL: Record<string, string> = {
+  AF:"Kabul",AL:"Tirana",DZ:"Algiers",AD:"Andorra la Vella",AO:"Luanda",
+  AG:"St. John's",AR:"Buenos Aires",AM:"Yerevan",AU:"Canberra",AT:"Vienna",
+  AZ:"Baku",BS:"Nassau",BH:"Manama",BD:"Dhaka",BB:"Bridgetown",BY:"Minsk",
+  BE:"Brussels",BZ:"Belmopan",BJ:"Porto-Novo",BT:"Thimphu",BO:"Sucre",
+  BA:"Sarajevo",BW:"Gaborone",BR:"Brasília",BN:"Bandar Seri Begawan",
+  BG:"Sofia",BF:"Ouagadougou",BI:"Gitega",KH:"Phnom Penh",CM:"Yaoundé",
+  CA:"Ottawa",CV:"Praia",CF:"Bangui",TD:"N'Djamena",CL:"Santiago",
+  CN:"Beijing",CO:"Bogotá",KM:"Moroni",CG:"Brazzaville",CD:"Kinshasa",
+  CR:"San José",CI:"Yamoussoukro",HR:"Zagreb",CU:"Havana",CY:"Nicosia",
+  CZ:"Prague",DK:"Copenhagen",DJ:"Djibouti",DM:"Roseau",DO:"Santo Domingo",
+  EC:"Quito",EG:"Cairo",SV:"San Salvador",GQ:"Malabo",ER:"Asmara",
+  EE:"Tallinn",SZ:"Mbabane",ET:"Addis Ababa",FJ:"Suva",FI:"Helsinki",
+  FR:"Paris",GA:"Libreville",GM:"Banjul",GE:"Tbilisi",DE:"Berlin",
+  GH:"Accra",GR:"Athens",GD:"St. George's",GT:"Guatemala City",GN:"Conakry",
+  GW:"Bissau",GY:"Georgetown",HT:"Port-au-Prince",HN:"Tegucigalpa",
+  HU:"Budapest",IS:"Reykjavik",IN:"New Delhi",ID:"Jakarta",IR:"Tehran",
+  IQ:"Baghdad",IE:"Dublin",IL:"Jerusalem",IT:"Rome",JM:"Kingston",
+  JP:"Tokyo",JO:"Amman",KZ:"Astana",KE:"Nairobi",KI:"Tarawa",
+  KP:"Pyongyang",KR:"Seoul",KW:"Kuwait City",KG:"Bishkek",LA:"Vientiane",
+  LV:"Riga",LB:"Beirut",LS:"Maseru",LR:"Monrovia",LY:"Tripoli",
+  LI:"Vaduz",LT:"Vilnius",LU:"Luxembourg",MG:"Antananarivo",MW:"Lilongwe",
+  MY:"Kuala Lumpur",MV:"Malé",ML:"Bamako",MT:"Valletta",MR:"Nouakchott",
+  MU:"Port Louis",MX:"Mexico City",MD:"Chișinău",MC:"Monaco",MN:"Ulaanbaatar",
+  ME:"Podgorica",MA:"Rabat",MZ:"Maputo",MM:"Naypyidaw",NA:"Windhoek",
+  NP:"Kathmandu",NL:"Amsterdam",NZ:"Wellington",NI:"Managua",NE:"Niamey",
+  NG:"Abuja",MK:"Skopje",NO:"Oslo",OM:"Muscat",PK:"Islamabad",
+  PA:"Panama City",PG:"Port Moresby",PY:"Asunción",PE:"Lima",PH:"Manila",
+  PL:"Warsaw",PT:"Lisbon",QA:"Doha",RO:"Bucharest",RU:"Moscow",
+  RW:"Kigali",SA:"Riyadh",SN:"Dakar",RS:"Belgrade",SL:"Freetown",
+  SG:"Singapore",SK:"Bratislava",SI:"Ljubljana",SB:"Honiara",SO:"Mogadishu",
+  ZA:"Pretoria",SS:"Juba",ES:"Madrid",LK:"Colombo",SD:"Khartoum",
+  SR:"Paramaribo",SE:"Stockholm",CH:"Bern",SY:"Damascus",TW:"Taipei",
+  TJ:"Dushanbe",TZ:"Dodoma",TH:"Bangkok",TL:"Dili",TG:"Lomé",
+  TO:"Nukuʻalofa",TT:"Port of Spain",TN:"Tunis",TR:"Ankara",TM:"Ashgabat",
+  UG:"Kampala",UA:"Kyiv",AE:"Abu Dhabi",GB:"London",US:"Washington, D.C.",
+  UY:"Montevideo",UZ:"Tashkent",VU:"Port Vila",VE:"Caracas",
+  VN:"Hanoi",YE:"Sana'a",ZM:"Lusaka",ZW:"Harare",PS:"Ramallah",XK:"Pristina",
+  EH:"Laayoune",
+};
+
+/* ── ISO-A3 / ADM0_A3 → ISO-A2  (comprehensive, covers all Natural Earth entries) ── */
+const A3_TO_A2: Record<string, string> = {
+  AFG:"AF",ALB:"AL",DZA:"DZ",AND:"AD",AGO:"AO",ATG:"AG",ARG:"AR",ARM:"AM",
+  AUS:"AU",AUT:"AT",AZE:"AZ",BHS:"BS",BHR:"BH",BGD:"BD",BRB:"BB",BLR:"BY",
+  BEL:"BE",BLZ:"BZ",BEN:"BJ",BTN:"BT",BOL:"BO",BIH:"BA",BWA:"BW",BRA:"BR",
+  BRN:"BN",BGR:"BG",BFA:"BF",BDI:"BI",KHM:"KH",CMR:"CM",CAN:"CA",CPV:"CV",
+  CAF:"CF",TCD:"TD",CHL:"CL",CHN:"CN",COL:"CO",COM:"KM",COG:"CG",COD:"CD",
+  CRI:"CR",CIV:"CI",HRV:"HR",CUB:"CU",CYP:"CY",CZE:"CZ",DNK:"DK",DJI:"DJ",
+  DMA:"DM",DOM:"DO",ECU:"EC",EGY:"EG",SLV:"SV",GNQ:"GQ",ERI:"ER",EST:"EE",
+  SWZ:"SZ",ETH:"ET",FJI:"FJ",FIN:"FI",FRA:"FR",GAB:"GA",GMB:"GM",GEO:"GE",
+  DEU:"DE",GHA:"GH",GRC:"GR",GRD:"GD",GTM:"GT",GIN:"GN",GNB:"GW",GUY:"GY",
+  HTI:"HT",HND:"HN",HUN:"HU",ISL:"IS",IND:"IN",IDN:"ID",IRN:"IR",IRQ:"IQ",
+  IRL:"IE",ISR:"IL",ITA:"IT",JAM:"JM",JPN:"JP",JOR:"JO",KAZ:"KZ",KEN:"KE",
+  KIR:"KI",PRK:"KP",KOR:"KR",KWT:"KW",KGZ:"KG",LAO:"LA",LVA:"LV",LBN:"LB",
+  LSO:"LS",LBR:"LR",LBY:"LY",LIE:"LI",LTU:"LT",LUX:"LU",MDG:"MG",MWI:"MW",
+  MYS:"MY",MDV:"MV",MLI:"ML",MLT:"MT",MRT:"MR",MUS:"MU",MEX:"MX",MDA:"MD",
+  MCO:"MC",MNG:"MN",MNE:"ME",MAR:"MA",MOZ:"MZ",MMR:"MM",NAM:"NA",NPL:"NP",
+  NLD:"NL",NZL:"NZ",NIC:"NI",NER:"NE",NGA:"NG",MKD:"MK",NOR:"NO",OMN:"OM",
+  PAK:"PK",PAN:"PA",PNG:"PG",PRY:"PY",PER:"PE",PHL:"PH",POL:"PL",PRT:"PT",
+  QAT:"QA",ROU:"RO",RUS:"RU",RWA:"RW",SAU:"SA",SEN:"SN",SRB:"RS",SLE:"SL",
+  SGP:"SG",SVK:"SK",SVN:"SI",SLB:"SB",SOM:"SO",ZAF:"ZA",SSD:"SS",ESP:"ES",
+  LKA:"LK",SDN:"SD",SUR:"SR",SWE:"SE",CHE:"CH",SYR:"SY",TWN:"TW",TJK:"TJ",
+  TZA:"TZ",THA:"TH",TLS:"TL",TGO:"TG",TON:"TO",TTO:"TT",TUN:"TN",TUR:"TR",
+  TKM:"TM",UGA:"UG",UKR:"UA",ARE:"AE",GBR:"GB",USA:"US",URY:"UY",UZB:"UZ",
+  VUT:"VU",VEN:"VE",VNM:"VN",YEM:"YE",ZMB:"ZM",ZWE:"ZW",PSE:"PS",ESH:"EH",
+  /* Natural Earth special ADM0_A3 codes */
+  KOS:"XK",  /* Kosovo */
+  SOL:"SO",  /* Somaliland → Somalia fallback */
+  CYN:"CY",  /* Northern Cyprus → Cyprus */
+  KAS:"IN",  /* Kashmir → India */
+  SAH:"EH",  /* Western Sahara */
+  SDS:"SS",  /* South Sudan (alternate) */
+  NRU:"NR",WSM:"WS",FSM:"FM",PLW:"PW",MHL:"MH",TUV:"TV",
+  SCG:"RS",  /* Serbia and Montenegro legacy */
+  GRL:"GL",  /* Greenland */
+  NCL:"NC",  /* New Caledonia */
+  PYF:"PF",  /* French Polynesia */
+  FLK:"FK",  /* Falkland Islands */
+  GUF:"GF",  /* French Guiana */
+  ATF:"TF",  /* French Southern Territories */
+  SPM:"PM",  /* Saint Pierre and Miquelon */
+  WLF:"WF",  /* Wallis and Futuna */
+  REU:"RE",  /* Réunion */
+  MYT:"YT",  /* Mayotte */
+  MTQ:"MQ",  /* Martinique */
+  GLP:"GP",  /* Guadeloupe */
+  PRI:"PR",  /* Puerto Rico */
+  VIR:"VI",  /* US Virgin Islands */
+  GUM:"GU",  /* Guam */
+  ASM:"AS",  /* American Samoa */
+  MNP:"MP",  /* Northern Mariana Islands */
+  CUW:"CW",ABW:"AW",SXM:"SX",BES:"BQ",
+  AIA:"AI",BMU:"BM",VGB:"VG",CYM:"KY",MSR:"MS",TCA:"TC",
+  SHN:"SH",IOT:"IO",PCN:"PN",SGS:"GS",HMD:"HM",BVT:"BV",
+  ATA:"AQ",SJM:"SJ",UMI:"UM",CCK:"CC",CXR:"CX",NFK:"NF",
+  TKL:"TK",NIU:"NU",COK:"CK",MAC:"MO",HKG:"HK",
+};
+
+/* ── ADMIN name → ISO-A2 (fallback for entries with no valid codes) ── */
+const ADMIN_TO_A2: Record<string, string> = {
+  "france":"FR","norway":"NO","northern cyprus":"CY","kosovo":"XK",
+  "somaliland":"SO","western sahara":"EH","united states of america":"US",
+  "united kingdom":"GB","united arab emirates":"AE","south korea":"KR",
+  "north korea":"KP","south sudan":"SS","democratic republic of the congo":"CD",
+  "republic of the congo":"CG","ivory coast":"CI","c\u00f4te d'ivoire":"CI",
+  "czech republic":"CZ","czechia":"CZ","eswatini":"SZ","swaziland":"SZ",
+  "timor-leste":"TL","east timor":"TL","myanmar":"MM","burma":"MM",
+  "republic of serbia":"RS","the bahamas":"BS","bahamas":"BS",
+  "trinidad and tobago":"TT","bosnia and herzegovina":"BA",
+  "antigua and barbuda":"AG","saint lucia":"LC","saint kitts and nevis":"KN",
+  "saint vincent and the grenadines":"VC","greenland":"GL",
+  "new caledonia":"NC","puerto rico":"PR","papua new guinea":"PG",
+  "central african republic":"CF","solomon islands":"SB",
+  "sierra leone":"SL","burkina faso":"BF","equatorial guinea":"GQ",
+  "dominican republic":"DO","saudi arabia":"SA","south africa":"ZA",
+  "sri lanka":"LK","new zealand":"NZ","costa rica":"CR","el salvador":"SV",
+  "taiwan":"TW","palestine":"PS","state of palestine":"PS","falkland islands":"FK",
+  "french guiana":"GF","r\u00e9union":"RE","reunion":"RE","mayotte":"YT",
+  "martinique":"MQ","guadeloupe":"GP",
+};
+
+/**
+ * Resolve any code/name from GeoJSON properties to a valid ISO-A2 code.
+ * Tries: direct 2-letter, A3→A2 lookup, ADM0_A3→A2 lookup, ADMIN name lookup.
+ * Returns empty string if nothing matches.
+ */
+function resolveIsoA2(props: Record<string, any>): string {
+  const clean = (v: any): string => {
+    const s = String(v ?? '').trim();
+    return s === '-99' || s === '-1' || s === '' ? '' : s;
+  };
+  // 1) Direct ISO_A2
+  const a2 = clean(props.ISO_A2);
+  if (a2.length === 2) return a2.toUpperCase();
+  // 2) ISO_A3 → lookup
+  const a3 = clean(props.ISO_A3);
+  if (a3 && A3_TO_A2[a3.toUpperCase()]) return A3_TO_A2[a3.toUpperCase()];
+  // 3) ADM0_A3 → lookup (different field, sometimes different value)
+  const adm = clean(props.ADM0_A3);
+  if (adm && A3_TO_A2[adm.toUpperCase()]) return A3_TO_A2[adm.toUpperCase()];
+  // 4) WB_A2 / FIPS_10_ (some NE versions)
+  const wb = clean(props.WB_A2);
+  if (wb.length === 2) return wb.toUpperCase();
+  // 5) ADMIN name → lookup
+  const admin = (props.ADMIN || props.NAME || '').toLowerCase().trim();
+  if (admin && ADMIN_TO_A2[admin]) return ADMIN_TO_A2[admin];
+  return '';
+}
 
 /** Return formatted local time for a country ISO-A2 code, or null. */
 function getCountryTime(iso: string): string | null {
@@ -140,17 +291,36 @@ function getTranslatedCountryName(
   }
 }
 
+/** Convert ISO-A2 code to flag emoji (regional indicator symbols). */
+function isoToFlag(iso: string): string {
+  const code = iso.toUpperCase();
+  if (code.length !== 2) return '\u{1F30D}';
+  return String.fromCodePoint(
+    ...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65)
+  );
+}
+
+/** CDN URL for a country flag SVG image (works everywhere, including Windows/Electron). */
+function flagUrl(iso: string): string {
+  return `https://flagcdn.com/w40/${iso.toLowerCase()}.png`;
+}
+
+/** Detect if the primary input is touch (mobile/tablet). */
+const IS_TOUCH_DEVICE = typeof window !== 'undefined'
+  && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+  && window.matchMedia('(pointer: coarse)').matches;
+
 /* ── CDN asset URLs ── */
 const GLOBE_DAY_URL =
-  "//unpkg.com/three-globe/example/img/earth-blue-marble.jpg";
+  "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg";
 const GLOBE_NIGHT_URL =
-  "//unpkg.com/three-globe/example/img/earth-night.jpg";
+  "https://unpkg.com/three-globe/example/img/earth-night.jpg";
 const BUMP_IMAGE_URL =
-  "//unpkg.com/three-globe/example/img/earth-topology.png";
+  "https://unpkg.com/three-globe/example/img/earth-topology.png";
 const NIGHT_SKY_URL =
-  "//unpkg.com/three-globe/example/img/night-sky.png";
+  "https://unpkg.com/three-globe/example/img/night-sky.png";
 const GEOJSON_URL =
-  "https://raw.githubusercontent.com/vasturiano/react-globe.gl/master/example/datasets/ne_110m_admin_0_countries.geojson";
+  "https://cdn.jsdelivr.net/gh/vasturiano/react-globe.gl@master/example/datasets/ne_110m_admin_0_countries.geojson";
 
 /* ── Public types ── */
 export interface CountryInfo {
@@ -206,7 +376,7 @@ function GlobeInner({
   /* ── Three.js Raycaster (reused across frames) ── */
   const raycasterRef = useRef(new THREE.Raycaster());
   const centerNDC = useRef(new THREE.Vector2(0, 0));
-  const throttleRef = useRef(0);
+  const rafIdRef = useRef(0);
 
   /* ── Responsive resize ── */
   useEffect(() => {
@@ -262,6 +432,32 @@ function GlobeInner({
     controls.autoRotateSpeed = paused ? 0 : rotationSpeed;
   }, [rotationSpeed, paused]);
 
+  /* ── Freeze / resume the Three.js render loop (battery saver) ──
+     When paused, setAnimationLoop(null) cancels the internal rAF.
+     No frames rendered, no shaders execute → 0% GPU while hidden.
+     On resume the existing WebGL context + textures are reused instantly. */
+  useEffect(() => {
+    const globe = globeRef.current;
+    if (!globe) return;
+    const renderer = globe.renderer?.();
+    if (!renderer) return;
+
+    if (paused) {
+      renderer.setAnimationLoop(null);
+    } else {
+      renderer.setAnimationLoop(() => {
+        const ctrl = globe.controls?.();
+        if (ctrl) ctrl.update();
+        renderer.render(globe.scene(), globe.camera());
+      });
+    }
+
+    /* Cleanup: ensure the loop is stopped if the component unmounts while running */
+    return () => {
+      renderer.setAnimationLoop(null);
+    };
+  }, [paused]);
+
   /* ── Fly to country when focusCountryIso changes ── */
   useEffect(() => {
     if (!focusCountryIso || !globeRef.current || countries.length === 0) return;
@@ -302,16 +498,12 @@ function GlobeInner({
   const extractCountryInfo = useCallback((feature: any) => {
     if (!feature) return null;
     const props = feature.properties ?? {};
-    const name = props.ADMIN || props.NAME || "Unknown";
-    const clean = (v: string | undefined) => {
-      const s = (v ?? "").trim();
-      return s === "-99" || s === "" ? "" : s;
-    };
-    const iso =
-      clean(props.ISO_A2) ||
-      clean(props.ISO_A3) ||
-      clean(props.ADM0_A3) ||
-      "";
+    const adminName = props.ADMIN || props.NAME || 'Unknown';
+    const iso = resolveIsoA2(props);
+    // Always produce a human-readable name, never a raw code
+    const name = iso
+      ? getTranslatedCountryName(iso, 'en')
+      : adminName;
     return { name, iso };
   }, []);
 
@@ -382,7 +574,9 @@ function GlobeInner({
            lat = 90 - acos(y / r) · 180/π
            lng = 90 - atan2(z, x) · 180/π           */
     const lat = 90 - Math.acos(Math.max(-1, Math.min(1, py / r))) * (180 / Math.PI);
-    const lng = 90 - Math.atan2(pz, px) * (180 / Math.PI);
+    let lng = 90 - Math.atan2(pz, px) * (180 / Math.PI);
+    if (lng > 180) lng -= 360;
+    if (lng < -180) lng += 360;
     return { lat, lng };
   }, []);
 
@@ -470,29 +664,29 @@ function GlobeInner({
     }
   }, [paused, getCenterCountryCombined, selectFeature]);
 
-  /* ── Live tracking: update label using lightweight geo-only path ── */
+  /* ── Live tracking via rAF loop (MOBILE only, 60fps-synced) ── */
   const updateTargetLabel = useCallback(() => {
-    const now = Date.now();
-    if (now - throttleRef.current < 80) return;    // throttle to ~12 Hz
-    throttleRef.current = now;
+    if (!IS_TOUCH_DEVICE) return;
+    if (paused) { setTargetedCountry(null); setLocalTime(null); return; }
 
-    if (paused) { setTargetedCountry(null); return; }
-
-    // Use geo-only (bbox + PIP) — no scene traversal, no raycaster
     const feature = getCenterCountryGeo();
     const info = feature ? extractCountryInfo(feature) : null;
     setTargetedCountry(info ?? null);
+    setLocalTime(info?.iso ? getCountryTime(info.iso) : null);
   }, [paused, getCenterCountryGeo, extractCountryInfo]);
 
-  const handlePointerMove = useCallback(() => {
-    updateTargetLabel();
-  }, [updateTargetLabel]);
-
-  /* Also run the label update while the globe auto-rotates (no pointer movement) */
+  /* rAF loop: runs every frame while the globe is visible (mobile only).
+     This catches auto-rotation, inertia, and active dragging at native refresh rate. */
   useEffect(() => {
-    if (paused) return;
-    const id = setInterval(updateTargetLabel, 200);   // ~5 fps label refresh during idle rotation
-    return () => clearInterval(id);
+    if (!IS_TOUCH_DEVICE || paused) return;
+    let active = true;
+    const loop = () => {
+      if (!active) return;
+      updateTargetLabel();
+      rafIdRef.current = requestAnimationFrame(loop);
+    };
+    rafIdRef.current = requestAnimationFrame(loop);
+    return () => { active = false; cancelAnimationFrame(rafIdRef.current); };
   }, [paused, updateTargetLabel]);
 
   /* ── Tick the live clock every second when a country is targeted ── */
@@ -554,6 +748,22 @@ function GlobeInner({
     [paused, selectFeature]
   );
 
+  /* ── Desktop: mouse hover on polygon → update badge ── */
+  const handlePolygonHover = useCallback(
+    (polygon: any) => {
+      if (IS_TOUCH_DEVICE || paused) return;
+      if (!polygon) {
+        setTargetedCountry(null);
+        setLocalTime(null);
+        return;
+      }
+      const info = extractCountryInfo(polygon);
+      setTargetedCountry(info ?? null);
+      setLocalTime(info?.iso ? getCountryTime(info.iso) : null);
+    },
+    [paused, extractCountryInfo]
+  );
+
   return (
     <div
       ref={containerRef}
@@ -561,8 +771,6 @@ function GlobeInner({
       style={{ touchAction: "none" }}
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      onPointerMove={handlePointerMove}
-      onTouchMove={handlePointerMove}
     >
       {/* ── Language toggle button (top-left, mirrors Dark-Mode on the right) ── */}
       <button
@@ -600,42 +808,70 @@ function GlobeInner({
       {/* ── Precision dot (neon blue) ── */}
       <Crosshair active={crosshairActive} />
 
-      {/* ── World Clock badge (premium glass pill) ── */}
+      {/* ── Country Info Badge (iOS Glassmorphism) ── */}
       <div
         className={`fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none
-                    flex items-center gap-2.5 px-5 py-2 rounded-full
-                    bg-[#0f172a]/60 backdrop-blur-lg border border-white/10
-                    shadow-[0_4px_30px_rgba(0,0,0,0.5)]
-                    transition-all duration-300 origin-top
-                    ${targetedCountry && localTime
+                    transition-all duration-200 origin-top
+                    ${targetedCountry
                       ? "opacity-100 scale-100"
-                      : "opacity-0 scale-95 pointer-events-none"}`}
+                      : "opacity-0 scale-90 pointer-events-none"}`}
+        style={{
+          background: 'rgba(15, 23, 42, 0.6)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderRadius: 16,
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          padding: '12px 20px',
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+          minWidth: 180,
+        }}
       >
-        {/* Clock icon */}
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="size-4 text-cyan-400 shrink-0"
-        >
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
-        </svg>
-        <span
-          className="whitespace-nowrap text-sm font-semibold tracking-wide text-white/95"
-          dir={uiLang === "ar" ? "rtl" : "ltr"}
-        >
-          {targetedCountry?.iso
+        {targetedCountry && (() => {
+          const hasIso = targetedCountry.iso.length === 2;
+          const displayName = hasIso
             ? getTranslatedCountryName(targetedCountry.iso, uiLang)
-            : targetedCountry?.name}
-          <span className="mx-2 opacity-30">|</span>
-          <span className="tabular-nums">{localTime}</span>
-        </span>
+            : targetedCountry.name;
+          const capital = hasIso ? COUNTRY_CAPITAL[targetedCountry.iso.toUpperCase()] : null;
+          const time = localTime;
+          const showDetails = !!(capital && time);
+          return (
+            <div className="flex flex-col items-center gap-1.5">
+              {/* ── Top Row: Flag + Country Name ── */}
+              <div className="flex items-center gap-2.5">
+                {hasIso ? (
+                  <img
+                    src={flagUrl(targetedCountry.iso)}
+                    alt=""
+                    width={24}
+                    height={18}
+                    className="rounded-[3px] shadow-sm object-cover"
+                    style={{ minWidth: 24 }}
+                  />
+                ) : (
+                  <span className="text-lg leading-none">{"\u{1F30D}"}</span>
+                )}
+                <span
+                  className="text-[15px] font-bold text-white tracking-wide"
+                  dir={uiLang === 'ar' ? 'rtl' : 'ltr'}
+                >
+                  {displayName}
+                </span>
+              </div>
+              {/* ── Bottom Row: Clock + Time + Capital (only if data exists) ── */}
+              {showDetails && (
+                <div className="flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: '#94a3b8' }}>
+                    <circle cx="12" cy="12" r="10" />
+                    <polyline points="12 6 12 12 16 14" />
+                  </svg>
+                  <span className="text-xs tabular-nums font-medium" style={{ color: '#cbd5e1' }}>{time}</span>
+                  <span className="text-xs" style={{ color: 'rgba(148, 163, 184, 0.5)' }}>{"\u2022"}</span>
+                  <span className="text-xs" style={{ color: '#cbd5e1' }}>{capital}</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
       {/* ── Loading overlay ── */}
       {loading && (
@@ -684,23 +920,9 @@ function GlobeInner({
         polygonSideColor={() => paused ? "rgba(0,0,0,0)" : "rgba(0, 255, 255, 0.05)"}
         polygonStrokeColor={() => paused ? "rgba(0,0,0,0)" : "#00ffff"}
         polygonAltitude={() => 0.005}
-        polygonLabel={(d: any) => {
-          const name =
-            d?.properties?.ADMIN || d?.properties?.NAME || "";
-          return `<div style="
-            color: #00ffff;
-            text-shadow: 0 0 6px rgba(0,255,255,0.8);
-            font-family: Inter, system-ui, sans-serif;
-            font-size: 14px;
-            font-weight: bold;
-            padding: 4px 8px;
-            background: rgba(0,0,0,0.6);
-            border: 1px solid rgba(0,255,255,0.3);
-            border-radius: 4px;
-          ">${name}</div>`;
-        }}
+        polygonLabel={() => ''}
         /* ── Interaction ── */
-        onPolygonHover={() => {}}
+        onPolygonHover={handlePolygonHover}
         onPolygonClick={handlePolygonClick}
         /* ── Performance ── */
         polygonsTransitionDuration={paused ? 0 : 300}

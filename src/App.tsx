@@ -4,27 +4,23 @@
    IPTV channel sidebar, and video player.
    ──────────────────────────────────────────── */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import Scene from "./components/Scene";
 import ChannelList from "./components/ChannelList";
 import Player from "./components/Player";
 import LeftSidebar from "./components/LeftSidebar";
 import SearchModal from "./components/SearchModal";
 import SettingsPanel from "./components/SettingsPanel";
-import type { GlobeSettings, PlaylistConfig } from "./components/SettingsPanel";
-import type { GlobeClickInfo, CountryInfo } from "./components/Globe";
+import type { PlaylistConfig } from "./components/SettingsPanel";
+import type { GlobeClickInfo } from "./components/Globe";
 import { useIPTV, type ChannelWithStream } from "./hooks/useIPTV";
 import { fetchNewsChannels } from "./hooks/useIPTV";
 import { fetchAndParseM3U } from "./utils/m3uParser";
+import { useUIStore } from "./stores/useUIStore";
+import { usePlayerStore } from "./stores/usePlayerStore";
+import { useFavoritesStore } from "./stores/useFavoritesStore";
 
-const FAVORITES_KEY = "cortex_favorites";
-const SETTINGS_KEY = "cortex_settings";
 const PLAYLIST_KEY = "cortex_playlist";
-
-const DEFAULT_SETTINGS: GlobeSettings = {
-  rotationSpeed: 0.4,
-  atmosphereIntensity: 0.25,
-};
 
 const DEFAULT_PLAYLIST: PlaylistConfig = {
   url: "",
@@ -32,47 +28,38 @@ const DEFAULT_PLAYLIST: PlaylistConfig = {
 };
 
 export default function App() {
-  /* ── Splash fade-out state ── */
-  const [splashVisible, setSplashVisible] = useState(true);
-  const [splashFading, setSplashFading] = useState(false);
+  /* ── Store state (granular selectors → minimal re-renders) ── */
+  const activeTab = useUIStore((s) => s.activeTab);
+  const selectedCountry = useUIStore((s) => s.selectedCountry);
+  const focusCountryIso = useUIStore((s) => s.focusCountryIso);
+  const isNightMode = useUIStore((s) => s.isNightMode);
+  const globeSettings = useUIStore((s) => s.globeSettings);
+  const splashVisible = useUIStore((s) => s.splashVisible);
+  const splashFading = useUIStore((s) => s.splashFading);
+  const playingChannel = usePlayerStore((s) => s.playingChannel);
+  const favorites = useFavoritesStore((s) => s.favorites);
+
+  /* ── Store actions (stable refs — never trigger re-renders) ── */
+  const {
+    setActiveTab, selectCountry, setFocusCountryIso,
+    toggleNightMode, setGlobeSettings,
+    setSplashFading, setSplashVisible, navigateTo,
+  } = useUIStore.getState();
+  const { play: playChannel, close: closePlayer } = usePlayerStore.getState();
+  const { toggle: toggleFavorite } = useFavoritesStore.getState();
+
+  /* ── Splash fade-out ── */
   const splashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    /* Begin fade after a short delay to let the globe start rendering */
     splashTimerRef.current = setTimeout(() => {
       setSplashFading(true);
-      /* Remove from DOM after the CSS transition completes */
       setTimeout(() => setSplashVisible(false), 700);
     }, 1800);
     return () => { if (splashTimerRef.current) clearTimeout(splashTimerRef.current); };
   }, []);
 
-  /* ── State ── */
-  const [selectedCountry, setSelectedCountry] = useState<CountryInfo | null>(
-    null
-  );
-  const [playingChannel, setPlayingChannel] =
-    useState<ChannelWithStream | null>(null);
-  const [isNightMode, setIsNightMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<"globe" | "search" | "favorites" | "settings" | "news">("globe");
-  const [focusCountryIso, setFocusCountryIso] = useState<string | null>(null);
-  /* mobileLeftOpen removed — Menu button now toggles SettingsPanel directly */
-  const [favorites, setFavorites] = useState<ChannelWithStream[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  });
-  const [globeSettings, setGlobeSettings] = useState<GlobeSettings>(() => {
-    try {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}") };
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
-
-  /* ── Custom playlist state ── */
+  /* ── Local playlist state (not worth globalising) ── */
   const [playlistConfig, setPlaylistConfig] = useState<PlaylistConfig>(() => {
     try {
       return { ...DEFAULT_PLAYLIST, ...JSON.parse(localStorage.getItem(PLAYLIST_KEY) || "{}") };
@@ -83,16 +70,6 @@ export default function App() {
   const [playlistChannels, setPlaylistChannels] = useState<ChannelWithStream[]>([]);
   const [playlistLoading, setPlaylistLoading] = useState(false);
   const [playlistError, setPlaylistError] = useState<string | null>(null);
-
-  /* ── Persist favorites ── */
-  useEffect(() => {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
-  }, [favorites]);
-
-  /* ── Persist settings ── */
-  useEffect(() => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(globeSettings));
-  }, [globeSettings]);
 
   /* ── Persist playlist config ── */
   useEffect(() => {
@@ -108,7 +85,7 @@ export default function App() {
   }, []);
 
   /* ── Load M3U playlist ── */
-  const handleLoadPlaylist = useCallback(async (url: string) => {
+  const handleLoadPlaylist = async (url: string) => {
     setPlaylistLoading(true);
     setPlaylistError(null);
     try {
@@ -119,8 +96,8 @@ export default function App() {
       setPlaylistChannels(channels);
       setPlaylistConfig((prev) => ({ ...prev, url, enabled: true }));
       /* Close any open country sidebar when switching to playlist mode */
-      setSelectedCountry(null);
-      setPlayingChannel(null);
+      selectCountry(null);
+      closePlayer();
       console.log(`[M3U] Loaded ${channels.length} channels from ${url}`);
     } catch (err: any) {
       console.error("[M3U] Load failed:", err);
@@ -129,25 +106,22 @@ export default function App() {
     } finally {
       setPlaylistLoading(false);
     }
-  }, []);
+  };
 
   /* ── Clear playlist ── */
-  const handleClearPlaylist = useCallback(() => {
+  const handleClearPlaylist = () => {
     setPlaylistChannels([]);
     setPlaylistError(null);
     setPlaylistConfig({ url: "", enabled: false });
-  }, []);
+  };
 
   /* ── Browse loaded playlist (navigate away from settings) ── */
-  const handleBrowsePlaylist = useCallback(() => {
-    /* Ensure playlist mode is active */
+  const handleBrowsePlaylist = () => {
     setPlaylistConfig((prev) => ({ ...prev, enabled: true }));
-    /* Clear any selected country so the playlist sidebar takes over */
-    setSelectedCountry(null);
-    setPlayingChannel(null);
-    /* Switch to globe tab – closes Settings on both desktop & mobile */
+    selectCountry(null);
+    closePlayer();
     setActiveTab("globe");
-  }, []);
+  };
 
   /* ── IPTV data ── */
   const { channels, loading, error } = useIPTV(
@@ -155,62 +129,26 @@ export default function App() {
   );
 
   /* ── Globe click → open sidebar ── */
-  const handleCountryClick = useCallback((info: GlobeClickInfo) => {
+  const handleCountryClick = (info: GlobeClickInfo) => {
     if (info.country) {
-      setSelectedCountry(info.country);
-      setPlayingChannel(null);
+      selectCountry(info.country);
+      closePlayer();
     }
-  }, []);
-
-  /* ── Close sidebar → back to globe ── */
-  const handleCloseSidebar = useCallback(() => {
-    setSelectedCountry(null);
-    setPlayingChannel(null);
-  }, []);
-
-  /* ── Play a channel ── */
-  const handlePlayChannel = useCallback((channel: ChannelWithStream) => {
-    setPlayingChannel(channel);
-  }, []);
-
-  /* ── Close player → back to sidebar ── */
-  const handleClosePlayer = useCallback(() => {
-    setPlayingChannel(null);
-  }, []);
-
-  /* ── Toggle a channel in favorites ── */
-  const toggleFavorite = useCallback((channel: ChannelWithStream) => {
-    setFavorites((prev) => {
-      const exists = prev.some((c) => c.id === channel.id);
-      return exists
-        ? prev.filter((c) => c.id !== channel.id)
-        : [...prev, channel];
-    });
-  }, []);
+  };
 
   /* ── News channels state ── */
   const [newsChannels, setNewsChannels] = useState<ChannelWithStream[]>([]);
   const [newsLoading, setNewsLoading] = useState(false);
 
   /* ── Toggle favorites panel ── */
-  const handleToggleFavorites = useCallback(() => {
-    setActiveTab((prev) => {
-      if (prev === "favorites") return "globe";
-      return "favorites";
-    });
-    setSelectedCountry(null);
-    setPlayingChannel(null);
-  }, []);
+  const handleToggleFavorites = () => {
+    navigateTo(activeTab === "favorites" ? "globe" : "favorites");
+  };
 
   /* ── Toggle news panel ── */
-  const handleToggleNews = useCallback(() => {
-    setActiveTab((prev) => {
-      if (prev === "news") return "globe";
-      return "news";
-    });
-    setSelectedCountry(null);
-    setPlayingChannel(null);
-  }, []);
+  const handleToggleNews = () => {
+    navigateTo(activeTab === "news" ? "globe" : "news");
+  };
 
   /* ── Load news channels when news tab activates ── */
   useEffect(() => {
@@ -227,19 +165,17 @@ export default function App() {
   }, [activeTab, playlistChannels]);
 
   /* ── Search modal channel selection ── */
-  const handleSearchSelect = useCallback((channel: ChannelWithStream) => {
-    /* Close sidebars, fly globe to channel's country, then play */
+  const handleSearchSelect = (channel: ChannelWithStream) => {
     setActiveTab("globe");
-    setSelectedCountry({
+    selectCountry({
       name: channel.country || "Unknown",
       iso: channel.country || "",
     });
     setFocusCountryIso(channel.country || null);
-    /* Small delay to let the globe fly, then auto-play */
     setTimeout(() => {
-      setPlayingChannel(channel);
+      playChannel(channel);
     }, 400);
-  }, []);
+  };
 
   /* ── Global keyboard shortcuts ── */
   useEffect(() => {
@@ -257,7 +193,7 @@ export default function App() {
         !e.altKey &&
         document.activeElement?.tagName !== "INPUT"
       ) {
-        setIsNightMode((v) => !v);
+        toggleNightMode();
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -285,6 +221,9 @@ export default function App() {
     activeTab === "favorites" ||
     activeTab === "news";
 
+  /* ── Scene visibility (persistent mount, render loop paused when hidden) ── */
+  const sceneVisible = activeTab === 'globe' && !isPlaylistMode && !playingChannel;
+
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden overscroll-none">
       {/* ── Conditional fake status bar: shown on sub-screens only, hidden on the
@@ -292,24 +231,30 @@ export default function App() {
       {activeTab !== 'globe' && !playingChannel && (
         <div className="fixed top-0 left-0 right-0 h-12 bg-[#0f172a] z-[99999] md:hidden" />
       )}
-      {/* ── 3D Canvas – unmounted when not visible to release GPU (battery saver) ── */}
-      {activeTab === 'globe' && !isPlaylistMode && !playingChannel && (
-        <div className="absolute inset-0 z-0">
-          <Scene
-            onCountryClick={handleCountryClick}
-            isNightMode={isNightMode}
-            rotationSpeed={globeSettings.rotationSpeed}
-            atmosphereIntensity={globeSettings.atmosphereIntensity}
-            focusCountryIso={focusCountryIso}
-          />
-        </div>
-      )}
+      {/* ── 3D Canvas – always mounted, hidden via CSS when not active.
+           The Three.js render loop is frozen when paused → 0% GPU. ── */}
+      <div
+        className="absolute inset-0 z-0"
+        style={{
+          visibility: sceneVisible ? 'visible' : 'hidden',
+          pointerEvents: sceneVisible ? 'auto' : 'none',
+        }}
+      >
+        <Scene
+          onCountryClick={handleCountryClick}
+          isNightMode={isNightMode}
+          rotationSpeed={globeSettings.rotationSpeed}
+          atmosphereIntensity={globeSettings.atmosphereIntensity}
+          focusCountryIso={focusCountryIso}
+          paused={!sceneVisible}
+        />
+      </div>
 
       {/* ── Left Toolbar (desktop only) ── */}
       {!playingChannel && (
         <LeftSidebar
           isNightMode={isNightMode}
-          onToggleNightMode={() => setIsNightMode((v) => !v)}
+          onToggleNightMode={toggleNightMode}
           showFavorites={activeTab === "favorites"}
           onToggleFavorites={handleToggleFavorites}
           showNews={activeTab === "news"}
@@ -325,7 +270,7 @@ export default function App() {
           onTouchStart={(e) => e.stopPropagation()}
           onTouchEnd={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); setIsNightMode((v) => !v); }}
+          onClick={(e) => { e.stopPropagation(); toggleNightMode(); }}
           className="absolute top-[4.5rem] right-4 z-50 md:hidden flex items-center justify-center h-10 w-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10 text-white/60 hover:text-cyan-400 active:scale-90 transition-all shadow-lg"
           aria-label={isNightMode ? "Switch to Day" : "Switch to Night"}
         >
@@ -385,11 +330,7 @@ export default function App() {
           <div className="flex items-stretch h-14 bg-[#0A192F]/95 backdrop-blur-xl border-t border-white/[0.06]">
             {/* Globe / Home */}
             <button
-              onClick={() => {
-                setActiveTab("globe");
-                setSelectedCountry(null);
-                setPlayingChannel(null);
-              }}
+              onClick={() => navigateTo("globe")}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors active:scale-95 ${
                 activeTab === "globe"
                   ? "text-cyan-400"
@@ -473,10 +414,10 @@ export default function App() {
           channels={playlistChannels}
           loading={playlistLoading}
           error={playlistError}
-          onPlayChannel={handlePlayChannel}
+          onPlayChannel={playChannel}
           onClose={() => {
             setPlaylistConfig((p) => ({ ...p, enabled: false }));
-            if (playingChannel) setPlayingChannel(null);
+            closePlayer();
           }}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
@@ -492,10 +433,10 @@ export default function App() {
           channels={channels}
           loading={loading}
           error={error}
-          onPlayChannel={handlePlayChannel}
+          onPlayChannel={playChannel}
           onClose={() => {
-            handleCloseSidebar();
-            if (playingChannel) setPlayingChannel(null);
+            selectCountry(null);
+            closePlayer();
           }}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
@@ -511,7 +452,7 @@ export default function App() {
           channels={favorites}
           loading={false}
           error={null}
-          onPlayChannel={handlePlayChannel}
+          onPlayChannel={playChannel}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           isPlaying={!!playingChannel}
@@ -526,7 +467,7 @@ export default function App() {
           channels={newsChannels}
           loading={newsLoading}
           error={null}
-          onPlayChannel={handlePlayChannel}
+          onPlayChannel={playChannel}
           onClose={() => setActiveTab("globe")}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
@@ -537,7 +478,7 @@ export default function App() {
 
       {/* ── Video Player ── */}
       {playingChannel && (
-        <Player channel={playingChannel} onClose={handleClosePlayer} />
+        <Player channel={playingChannel} onClose={closePlayer} />
       )}
 
       {/* ── Global Search Modal ── */}

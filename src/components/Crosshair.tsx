@@ -8,11 +8,9 @@ import { memo } from "react";
 interface CrosshairProps {
   /** Brief pulse animation on successful lock */
   active?: boolean;
-  /** Name of the country currently under the crosshair */
-  targetName?: string | null;
 }
 
-function CrosshairInner({ active = false, targetName }: CrosshairProps) {
+function CrosshairInner({ active = false }: CrosshairProps) {
   return (
     <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center hidden [@media(pointer:coarse)]:flex [will-change:transform]">
       {/* ── Neon blue precision dot ── */}
