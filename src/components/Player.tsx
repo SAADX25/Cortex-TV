@@ -29,6 +29,18 @@ const IS_ELECTRON = typeof navigator !== "undefined" &&
 
 const IS_NATIVE = Capacitor.isNativePlatform(); // true on Android/iOS APK
 
+/*
+ * True when the app is running in a real browser (not Electron, not Android)
+ * AND is deployed to a production origin (GitHub Pages, any non-localhost host).
+ * On production there is no Vite dev-server proxy, so cross-origin requests
+ * must go through the Cloudflare Worker instead.
+ */
+const IS_PROD_BROWSER =
+  !IS_ELECTRON &&
+  !IS_NATIVE &&
+  typeof window !== 'undefined' &&
+  !/localhost|127\.0\.0\.1/.test(window.location.hostname);
+
 const PROXY_RULES: Array<{ match: RegExp; prefix: string; strip: string }> = [
   // rotana.hibridcdn.net  → /proxy/rotana
   { match: /https?:\/\/rotana\.hibridcdn\.net/i, prefix: "/proxy/rotana", strip: "rotana.hibridcdn.net" },
@@ -85,6 +97,16 @@ function needsCloudProxy(url: string): boolean {
   }
 }
 
+/** Returns true for video segment URLs (.ts, .mp4, .m4s, etc.). */
+function isSegmentUrl(url: string): boolean {
+  try {
+    const path = new URL(url).pathname;
+    return /\.(ts|aac|mp4|m4s|fmp4|cmfv|cmfa|vtt|webvtt)(\?.*)?$/i.test(path);
+  } catch {
+    return false;
+  }
+}
+
 function proxyRewrite(url: string): string {
   if (IS_ELECTRON) return url;                       // Electron handles headers itself
 
@@ -93,6 +115,22 @@ function proxyRewrite(url: string): string {
     if (needsCloudProxy(url)) {
       const proxied = CLOUD_PROXY + encodeURIComponent(url);
       console.log(`[Player] Cloud proxy: ${url} → ${proxied}`);
+      return proxied;
+    }
+    return url;
+  }
+
+  if (IS_PROD_BROWSER) {
+    /*
+     * Production browser (GitHub Pages) — no Vite proxy available.
+     * Route ONLY the initial .m3u8 manifest for known blocked CDNs through
+     * the Cloudflare Worker.  The Worker will rewrite all segment URIs to
+     * absolute origin URLs so hls.js fetches video chunks directly.
+     * Sub-playlists are also rewritten to loop back through the Worker.
+     */
+    if (needsCloudProxy(url)) {
+      const proxied = CLOUD_PROXY + encodeURIComponent(url);
+      console.log(`[Player] CF Worker (browser): ${url} → ${proxied}`);
       return proxied;
     }
     return url;
@@ -141,8 +179,12 @@ function createNativeProxyLoader(debugFn?: (msg: string) => void) {
 
       const realCdnUrl = cdnUrl;
 
-      // ── Step 2: wrap cross-origin URLs in the Cloudflare Worker proxy ──
-      if (needsCloudProxy(cdnUrl)) {
+      // ── Step 2: wrap cross-origin m3u8 URLs in the Cloudflare Worker proxy ──
+      // IMPORTANT: never proxy .ts/.mp4/.m4s segments — the Worker refuses them
+      // to prevent bandwidth abuse.  The Worker already rewrote segment URIs in
+      // the manifest to absolute origin URLs, so they reach here without the
+      // CLOUD_PROXY prefix and should be fetched directly.
+      if (needsCloudProxy(cdnUrl) && !isSegmentUrl(cdnUrl)) {
         context.url = CLOUD_PROXY + encodeURIComponent(cdnUrl);
         debugFn?.(`📡 Proxy load: ${cdnUrl.substring(0, 70)}`);
       }
@@ -483,7 +525,14 @@ export default function Player({ channel, onClose }: PlayerProps) {
            * every XHR here and re-open with the proxied URL so ALL
            * requests go through the Vite dev-server proxy.
            */
-          if (!IS_ELECTRON) {
+          /*
+           * Dev server only: rewrite through Vite proxy.
+           * On production (IS_PROD_BROWSER) the Cloudflare Worker already
+           * rewrote all sub-playlist and segment URIs inside the manifest, so
+           * every subsequent hls.js request goes to the correct destination
+           * without any further interception needed here.
+           */
+          if (!IS_ELECTRON && !IS_PROD_BROWSER) {
             let rewritten: string | null = null;
             for (const rule of PROXY_RULES) {
               if (rule.match.test(url)) {
