@@ -6,7 +6,7 @@ import renderer from "vite-plugin-electron-renderer";
 import path from "node:path";
 
 export default defineConfig({
-  base: "./",
+  base: "/Cortex-TV/",
   server: {
     middlewareMode: false,
     hmr: {
