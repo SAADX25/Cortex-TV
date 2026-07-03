@@ -512,6 +512,33 @@ export default function SettingsPanel({
             </div>
           </section>
 
+          {/* ══ Legal & Disclaimer Card ══ */}
+          <section>
+            <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3 ml-2">
+              Legal &amp; Disclaimer
+            </h3>
+            <div className="bg-[#112240] rounded-2xl p-4 space-y-3 text-xs text-white/40 leading-relaxed">
+              <p>
+                Cortex TV is a <span className="text-white/60 font-medium">free, open-source</span> channel browser.
+                It does <strong className="text-white/60">not</strong> host, store, or redistribute any media content.
+              </p>
+              <p>
+                All channel metadata is sourced from the{" "}
+                <span className="text-cyan-400/60">iptv-org/iptv</span> public database.
+                Stream URLs are publicly available and community-maintained.
+              </p>
+              <p>
+                Some streams may be geo-restricted in your country. Use of this
+                app is at your own discretion and subject to the laws of your
+                region. Only free, publicly accessible channels are shown.
+              </p>
+              <p>
+                This project is not affiliated with any broadcaster or
+                streaming platform.
+              </p>
+            </div>
+          </section>
+
           {/* ══ Technical Info Card ══ */}
           <section>
             <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3 ml-2">
@@ -519,7 +546,7 @@ export default function SettingsPanel({
             </h3>
             <div className="bg-[#112240] rounded-2xl p-4 space-y-0">
               <InfoRow label="Developer" value="SAADX25" highlight />
-              <InfoRow label="App Version" value="1.0.0" />
+              <InfoRow label="App Version" value="1.0.0-beta.1" />
               <InfoRow label="Framework" value="Electron + React 19" />
               <InfoRow label="Globe Engine" value="react-globe.gl" />
               <InfoRow label="Player" value="hls.js (native)" />

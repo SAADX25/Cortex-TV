@@ -10,6 +10,7 @@ import { Capacitor } from "@capacitor/core";
 import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "../hooks/useIPTV";
 import { resolveStream } from "../utils/StreamResolver";
+import { flagUrl, cleanName, GEO_BLOCK_COUNTRIES } from "../utils/channelUtils";
 
 interface PlayerProps {
   channel: ChannelWithStream;
@@ -250,7 +251,7 @@ function BrokenTvIcon({ className }: { className?: string }) {
 }
 
 /* ── Countries known to heavily geo-block streams ── */
-const GEO_BLOCK_COUNTRIES = new Set(["UK", "GB", "FR"]);
+// GEO_BLOCK_COUNTRIES is imported from channelUtils
 
 /* ── Categorise error for user-friendly messaging ── */
 function categoriseError(details: string, country?: string): {
@@ -303,13 +304,6 @@ function categoriseError(details: string, country?: string): {
   };
 }
 
-/* ── Country flag CDN helper (same as ChannelList) ── */
-const FLAG_CODE_MAP: Record<string, string> = { uk: "gb" };
-const sidebarFlagUrl = (iso: string) => {
-  const code = iso.toLowerCase();
-  return `https://flagcdn.com/w40/${FLAG_CODE_MAP[code] ?? code}.png`;
-};
-
 /* ── Strip geo-block noise from channel names ── */
 const CLEAN_RE = /\[geo[- ]?blocked\]|\[blocked\]|\[not 24\/7\]/gi;
 
@@ -336,7 +330,7 @@ const SidebarRow = memo(function SidebarRow({
   isActive: boolean;
   onPlay: () => void;
 }) {
-  const displayName = ch.name.replace(CLEAN_RE, "").replace(/\s{2,}/g, " ").trim();
+  const displayName = cleanName(ch.name);
   const categoryLabel = ch.categories[0]?.toUpperCase().substring(0, 8) || "";
 
   return (
@@ -365,7 +359,7 @@ const SidebarRow = memo(function SidebarRow({
       }`}>
         {ch.country ? (
           <img
-            src={sidebarFlagUrl(ch.country)}
+            src={flagUrl(ch.country)}
             alt={ch.country}
             className="w-full h-full object-cover"
             loading="lazy"
@@ -957,21 +951,25 @@ export default function Player({
             onPlaying={handlePlaying}
           />
 
-          {/* ── Debug overlay (mobile) ── */}
-          <button
-            onClick={() => setShowDebug((p) => !p)}
-            className="absolute bottom-2 right-2 z-[20] bg-black/70 text-[9px] text-yellow-400 px-2 py-1 rounded border border-yellow-500/30"
-          >
-            {showDebug ? "Hide Log" : "🐛 Debug"}
-          </button>
-          {showDebug && (
-            <div className="absolute inset-x-0 bottom-8 z-[20] max-h-[40%] overflow-y-auto bg-black/90 border-t border-yellow-500/30 p-2">
-              {debugLog.length === 0 ? (
-                <p className="text-[9px] text-white/30">No log entries yet…</p>
-              ) : debugLog.map((line, i) => (
-                <p key={i} className="text-[9px] text-green-400/80 font-mono leading-relaxed">{line}</p>
-              ))}
-            </div>
+          {/* ── Debug overlay (dev only) ── */}
+          {import.meta.env.DEV && (
+            <>
+              <button
+                onClick={() => setShowDebug((p) => !p)}
+                className="absolute bottom-2 right-2 z-[20] bg-black/70 text-[9px] text-yellow-400 px-2 py-1 rounded border border-yellow-500/30"
+              >
+                {showDebug ? "Hide Log" : "🐛 Debug"}
+              </button>
+              {showDebug && (
+                <div className="absolute inset-x-0 bottom-8 z-[20] max-h-[40%] overflow-y-auto bg-black/90 border-t border-yellow-500/30 p-2">
+                  {debugLog.length === 0 ? (
+                    <p className="text-[9px] text-white/30">No log entries yet…</p>
+                  ) : debugLog.map((line, i) => (
+                    <p key={i} className="text-[9px] text-green-400/80 font-mono leading-relaxed">{line}</p>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 

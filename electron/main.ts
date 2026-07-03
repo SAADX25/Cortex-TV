@@ -1,13 +1,13 @@
-/* ─────────────────────────────────────────────────
-   electron/main.ts – Electron main process
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   electron/main.ts â€“ Electron main process
    Creates the BrowserWindow, loads the Vite dev
    server in dev or the built index.html in prod.
-   ───────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-import { app, BrowserWindow, screen, session } from "electron";
+import { app, BrowserWindow, Menu, screen, session } from "electron";
 import path from "node:path";
 
-// ── Env vars set by vite-plugin-electron ──
+// â”€â”€ Env vars set by vite-plugin-electron â”€â”€
 process.env.DIST = path.join(__dirname, "../dist");
 process.env.VITE_PUBLIC = app.isPackaged
   ? process.env.DIST
@@ -41,7 +41,7 @@ function createWindow() {
     },
   });
 
-  // ── Open DevTools in development ──
+  // â”€â”€ Open DevTools in development â”€â”€
   if (IS_DEV) {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
@@ -56,14 +56,14 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // ── Load content (with retry logic for dev server) ──
+  // â”€â”€ Load content (with retry logic for dev server) â”€â”€
   const loadContent = async () => {
     try {
       if (VITE_DEV_SERVER_URL) {
         console.log(`[Electron] Loading from dev server: ${VITE_DEV_SERVER_URL}`);
         await mainWindow!.loadURL(VITE_DEV_SERVER_URL);
       } else if (IS_DEV) {
-        // Fallback: dev mode but no env var → try localhost:5173 directly
+        // Fallback: dev mode but no env var â†’ try localhost:5173 directly
         console.log("[Electron] No VITE_DEV_SERVER_URL, trying http://localhost:5173");
         await mainWindow!.loadURL("http://localhost:5173");
       } else {
@@ -84,7 +84,7 @@ function createWindow() {
   }
 }
 
-// ── Network interceptor: ultimate CORS + 403 bypass ──
+// â”€â”€ Network interceptor: ultimate CORS + 403 bypass â”€â”€
 function setupWebRequestInterceptor() {
   const SMART_TV_UA =
     "Mozilla/5.0 (SMART-TV; LINUX; Tizen 6.5) AppleWebKit/537.36 " +
@@ -95,7 +95,7 @@ function setupWebRequestInterceptor() {
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
   /*
-   * ── Domain → spoofed Referer / Origin mapping ──
+   * â”€â”€ Domain â†’ spoofed Referer / Origin mapping â”€â”€
    * CDNs like hibridcdn.net check the Referer against a whitelist.
    * If we send the CDN's own origin (hibridcdn.net) it fails with 403.
    * We MUST send the *website* origin that the CDN expects.
@@ -167,7 +167,7 @@ function setupWebRequestInterceptor() {
     );
   };
 
-  // ══════════ REQUEST interceptor ══════════
+  // â•â•â•â•â•â•â•â•â•â• REQUEST interceptor â•â•â•â•â•â•â•â•â•â•
   session.defaultSession.webRequest.onBeforeSendHeaders(
     { urls: ["*://*/*"] },
     (details, callback) => {
@@ -197,7 +197,7 @@ function setupWebRequestInterceptor() {
     }
   );
 
-  // ══════════ RESPONSE interceptor ══════════
+  // â•â•â•â•â•â•â•â•â•â• RESPONSE interceptor â•â•â•â•â•â•â•â•â•â•
   session.defaultSession.webRequest.onHeadersReceived(
     { urls: ["*://*/*"] },
     (details, callback) => {
@@ -227,8 +227,9 @@ function setupWebRequestInterceptor() {
   console.log("[Electron] Ultimate CORS + 403 bypass interceptor installed");
 }
 
-// ── App lifecycle ──
+// â”€â”€ App lifecycle â”€â”€
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null);
   setupWebRequestInterceptor();
   createWindow();
 });

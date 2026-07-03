@@ -1,42 +1,48 @@
-/* ──────────────────────────────────────────────────
-   useIPTV.ts – Fetches and filters IPTV channels
-   from the free iptv-org API by country ISO code.
-   
-   All heavy processing (indexing, filtering, sorting,
-   searching) is offloaded to a Web Worker via the
-   iptvWorkerClient adapter. The main thread only
-   performs network fetches and trivial ISO expansion.
-   ────────────────────────────────────────────────── */
-
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import {
   ensureWorkerData,
   filterByCountry,
   processFallbackChannels,
 } from "../workers/iptvWorkerClient";
+import type { ChannelWithStream } from "../workers/iptvWorker.types";
 
-/* ── Re-export worker-delegated functions (preserves all consumer imports) ── */
 export {
-  searchAllChannels,
   fetchNewsChannels,
+  getBrowseMetadata,
+  getHomeData,
+  getIPTVDataStatus,
   preloadIPTVData,
+  searchAllChannels,
+  subscribeIPTVDataStatus,
 } from "../workers/iptvWorkerClient";
 
-/* ── ISO alias map for countries whose GeoJSON code differs from iptv-org ── */
+export type {
+  BrowseMetadata,
+  Channel,
+  ChannelWithStream,
+  HomeData,
+  MetadataOption,
+  SearchFilters,
+} from "../workers/iptvWorker.types";
+export type { IPTVDataStatus } from "../workers/iptvWorkerClient";
+
+export interface Stream {
+  channel: string;
+  url: string;
+  status?: string | null;
+}
+
 const ISO_ALIASES: Record<string, string[]> = {
-  GB: ["GB", "UK"],   // GeoJSON uses GB, iptv-org uses UK
+  GB: ["GB", "UK"],
   UK: ["GB", "UK"],
-  GBR: ["GB", "UK"],  // ISO_A3 fallback
-  FRA: ["FR"],         // Natural Earth ISO_A3 → iptv-org ISO_A2
+  GBR: ["GB", "UK"],
+  FRA: ["FR"],
   FR: ["FR"],
-  NOR: ["NO"],         // Norway ISO_A3 → NO
+  NOR: ["NO"],
   NO: ["NO"],
 };
 
-/**
- * Canonical ISO-A2 code used for the iptv-org country endpoint.
- * e.g. "FRA" → "fr", "GB" → "gb"
- */
 const ISO_CANONICAL: Record<string, string> = {
   FRA: "fr",
   FR: "fr",
@@ -47,51 +53,22 @@ const ISO_CANONICAL: Record<string, string> = {
   NO: "no",
 };
 
-/**
- * Last-resort: map country NAME to iptv-org ISO-A2 when the code
- * coming from GeoJSON is garbage ("-99", empty, etc.).
- */
 const NAME_TO_ISO: Record<string, string> = {
   france: "FR",
   "united kingdom": "GB",
   norway: "NO",
   "northern cyprus": "CY",
-  "somaliland": "SO",
+  somaliland: "SO",
   kosovo: "XK",
 };
 
-/** Expand a single ISO code (or country name) into all aliases (uppercase). */
 function expandIso(iso: string): string[] {
   const key = iso.toUpperCase().trim();
-  /* Reject garbage codes that leak from Natural Earth GeoJSON */
   if (!key || key === "-99") return [];
   if (ISO_ALIASES[key]) return ISO_ALIASES[key];
-  /* Try name-based lookup when the code is unknown */
   const byName = NAME_TO_ISO[iso.toLowerCase()];
   if (byName) return ISO_ALIASES[byName] ?? [byName];
   return [key];
-}
-
-/* ── Public types ── */
-export interface Channel {
-  id: string;
-  name: string;
-  logo: string | null;
-  country: string;        // ISO 3166-1 alpha-2 (e.g. "US")
-  categories: string[];
-  languages: string[];
-  website: string | null;
-  isNsfw: boolean;
-}
-
-export interface Stream {
-  channel: string;        // matches Channel.id
-  url: string;            // .m3u8 or direct stream URL
-  status: string;
-}
-
-export interface ChannelWithStream extends Channel {
-  streamUrl: string | null;
 }
 
 interface UseIPTVReturn {
@@ -100,13 +77,12 @@ interface UseIPTVReturn {
   error: string | null;
 }
 
-/* ── Country-endpoint fallback (fetch on main thread, process in worker) ── */
 function fetchCountryFallback(
   isoCode: string,
   token: number,
-  abortRef: React.MutableRefObject<number>,
-  setChannels: React.Dispatch<React.SetStateAction<ChannelWithStream[]>>,
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>
+  abortRef: MutableRefObject<number>,
+  setChannels: Dispatch<SetStateAction<ChannelWithStream[]>>,
+  setLoading: Dispatch<SetStateAction<boolean>>,
 ) {
   const code = isoCode.toLowerCase();
   const url = `https://iptv-org.github.io/api/countries/${code}.json`;
@@ -118,14 +94,13 @@ function fetchCountryFallback(
       const raw: any[] = await res.json();
       if (token !== abortRef.current) return;
 
-      /* Offload mapping + sorting to the worker */
       const mapped = await processFallbackChannels(raw);
       if (token !== abortRef.current) return;
 
       setChannels(mapped);
       setLoading(false);
       console.log(
-        `[IPTV] Fallback (${code}): ${mapped.length} channels (${mapped.filter((c) => c.streamUrl).length} with streams)`
+        `[IPTV] Fallback (${code}): ${mapped.length} channels (${mapped.filter((c) => c.streamUrl).length} with streams)`,
       );
     })
     .catch((err) => {
@@ -136,7 +111,6 @@ function fetchCountryFallback(
     });
 }
 
-/* ── Hook ── */
 export function useIPTV(countryIso: string | null): UseIPTVReturn {
   const [channels, setChannels] = useState<ChannelWithStream[]>([]);
   const [loading, setLoading] = useState(false);
@@ -154,19 +128,15 @@ export function useIPTV(countryIso: string | null): UseIPTVReturn {
     setLoading(true);
     setError(null);
 
-    /* Expand ISO on main thread (trivial string lookup) */
     const countryCodes = expandIso(countryIso);
 
-    /* Ensure data is fetched (main thread) and indexed (worker) */
     ensureWorkerData()
       .then(async () => {
-        if (token !== abortRef.current) return; // stale
+        if (token !== abortRef.current) return;
 
-        /* O(1) lookup via the worker's inverted country index */
         const filtered = await filterByCountry(countryCodes);
-        if (token !== abortRef.current) return; // stale
+        if (token !== abortRef.current) return;
 
-        /* ── Fallback: If 0 channels found, try the country-specific endpoint ── */
         if (filtered.length === 0) {
           const upper = countryIso.toUpperCase();
           const byName = NAME_TO_ISO[countryIso.toLowerCase()];
@@ -181,7 +151,7 @@ export function useIPTV(countryIso: string | null): UseIPTVReturn {
         setChannels(filtered);
         setLoading(false);
         console.log(
-          `[IPTV] ${filtered.length} channels for [${countryCodes.join(",")}] (${filtered.filter((c) => c.streamUrl).length} with streams)`
+          `[IPTV] ${filtered.length} channels for [${countryCodes.join(",")}] (${filtered.filter((c) => c.streamUrl).length} with streams)`,
         );
       })
       .catch((err) => {

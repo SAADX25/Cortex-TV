@@ -1,8 +1,8 @@
 {
   "name": "cortex-tv",
   "private": true,
-  "version": "1.0.0",
-  "description": "Cortex TV – 3D Interactive Globe IPTV Player",
+  "version": "1.0.0-beta.1",
+  "description": "Cortex TV – 3D Interactive Globe IPTV Explorer",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",

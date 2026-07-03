@@ -1,9 +1,9 @@
-/* ──────────────────────────────────────────────
-   LeftSidebar.tsx – Floating vertical toolbar
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   LeftSidebar.tsx â€“ Floating vertical toolbar
    Glassmorphic pill with placeholder tool buttons.
-   ────────────────────────────────────────────── */
+   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* ── Inline SVG icons (Lucide-style) ── */
+/* â”€â”€ Inline SVG icons (Lucide-style) â”€â”€ */
 function SettingsIcon() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -49,7 +49,7 @@ function NewsIcon() {
   );
 }
 
-/* ── Toolbar item ── */
+/* â”€â”€ Toolbar item â”€â”€ */
 interface ToolButtonProps {
   icon: React.ReactNode;
   label: string;
@@ -62,6 +62,7 @@ function ToolButton({ icon, label, onClick }: ToolButtonProps) {
       onClick={onClick}
       className="group relative flex items-center justify-center h-10 w-10 rounded-xl text-white/50 hover:text-cyan-400 hover:scale-110 hover:shadow-[0_0_14px_rgba(0,255,255,0.25)] cursor-pointer transition-all duration-300"
       title={label}
+      aria-label={label}
     >
       {icon}
       {/* Tooltip */}
@@ -72,7 +73,7 @@ function ToolButton({ icon, label, onClick }: ToolButtonProps) {
   );
 }
 
-/* ── Sidebar ── */
+/* â”€â”€ Sidebar â”€â”€ */
 interface LeftSidebarProps {
   isNightMode: boolean;
   onToggleNightMode: () => void;
@@ -94,7 +95,7 @@ export default function LeftSidebar({
   onOpenSearch,
   onOpenSettings,
 }: LeftSidebarProps) {
-  /* ── Shared icon for day/night ── */
+  /* â”€â”€ Shared icon for day/night â”€â”€ */
   const dayNightIcon = isNightMode ? (
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="4" />
@@ -125,7 +126,7 @@ export default function LeftSidebar({
 
   return (
     <>
-      {/* ── Desktop pill toolbar (hidden on mobile) ── */}
+      {/* â”€â”€ Desktop pill toolbar (hidden on mobile) â”€â”€ */}
       <div className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-50 flex-col items-center gap-4 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10 p-3 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
         <ToolButton
           icon={dayNightIcon}

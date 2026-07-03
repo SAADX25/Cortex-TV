@@ -1,9 +1,4 @@
-/* ──────────────────────────────────────────────────
-   iptvWorker.types.ts – Shared message protocol
-   between the main thread and the IPTV Web Worker.
-   ────────────────────────────────────────────────── */
-
-/* ── Domain types (duplicated here to keep the worker self-contained) ── */
+/* Shared message protocol between the main thread and the IPTV Web Worker. */
 
 export interface Channel {
   id: string;
@@ -14,13 +9,50 @@ export interface Channel {
   languages: string[];
   website: string | null;
   isNsfw: boolean;
+  altNames?: string[];
 }
 
 export interface ChannelWithStream extends Channel {
   streamUrl: string | null;
+  streamStatus?: string | null;
+  countryName?: string;
+  languageNames?: string[];
 }
 
-/* ── Main → Worker requests ── */
+export interface SearchFilters {
+  country?: string | null;
+  category?: string | null;
+  language?: string | null;
+  favoritesOnly?: boolean;
+  workingOnly?: boolean;
+}
+
+export interface MetadataOption {
+  value: string;
+  label: string;
+  count: number;
+}
+
+export interface BrowseMetadata {
+  channelCount: number;
+  streamCount: number;
+  countries: MetadataOption[];
+  categories: MetadataOption[];
+  languages: MetadataOption[];
+}
+
+export interface HomeData {
+  featured: ChannelWithStream[];
+  popular: ChannelWithStream[];
+  continueBrowsing: ChannelWithStream[];
+  countries: MetadataOption[];
+  categories: MetadataOption[];
+  languages: MetadataOption[];
+  channelCount: number;
+  streamCount: number;
+}
+
+/* Main -> Worker requests */
 
 export interface InitRequest {
   type: "INIT";
@@ -31,7 +63,6 @@ export interface InitRequest {
 export interface FilterByCountryRequest {
   type: "FILTER_BY_COUNTRY";
   id: number;
-  /** Pre-expanded ISO codes (e.g. ["GB","UK"]) — expansion stays on main thread */
   countryCodes: string[];
 }
 
@@ -40,14 +71,15 @@ export interface SearchRequest {
   id: number;
   query: string;
   limit: number;
-  categoryFilter: string | null;
+  filters: SearchFilters;
+  favoriteIds: string[];
+  recentIds: string[];
 }
 
 export interface FetchNewsRequest {
   type: "FETCH_NEWS";
   id: number;
   limit: number;
-  /** Playlist channels serialised from the main thread */
   extraPlaylistChannels: ChannelWithStream[];
 }
 
@@ -57,14 +89,28 @@ export interface ProcessFallbackRequest {
   rawChannels: any[];
 }
 
+export interface GetHomeDataRequest {
+  type: "GET_HOME_DATA";
+  id: number;
+  favoriteIds: string[];
+  recentIds: string[];
+}
+
+export interface GetMetadataRequest {
+  type: "GET_METADATA";
+  id: number;
+}
+
 export type WorkerRequest =
   | InitRequest
   | FilterByCountryRequest
   | SearchRequest
   | FetchNewsRequest
-  | ProcessFallbackRequest;
+  | ProcessFallbackRequest
+  | GetHomeDataRequest
+  | GetMetadataRequest;
 
-/* ── Worker → Main responses ── */
+/* Worker -> Main responses */
 
 export interface InitCompleteResponse {
   type: "INIT_COMPLETE";
@@ -96,6 +142,18 @@ export interface FallbackResultResponse {
   channels: ChannelWithStream[];
 }
 
+export interface HomeDataResponse {
+  type: "HOME_DATA_RESULT";
+  id: number;
+  data: HomeData;
+}
+
+export interface MetadataResponse {
+  type: "METADATA_RESULT";
+  id: number;
+  metadata: BrowseMetadata;
+}
+
 export interface ErrorResponse {
   type: "ERROR";
   id?: number;
@@ -108,4 +166,6 @@ export type WorkerResponse =
   | SearchResultResponse
   | NewsResultResponse
   | FallbackResultResponse
+  | HomeDataResponse
+  | MetadataResponse
   | ErrorResponse;

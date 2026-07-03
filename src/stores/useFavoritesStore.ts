@@ -13,9 +13,21 @@ import type { ChannelWithStream } from "../hooks/useIPTV";
 
 const FAVORITES_KEY = "cortex_favorites";
 
+function isValidChannel(c: unknown): c is ChannelWithStream {
+  if (!c || typeof c !== "object") return false;
+  const ch = c as Record<string, unknown>;
+  return (
+    typeof ch.id === "string" &&
+    ch.id.length > 0 &&
+    typeof ch.name === "string"
+  );
+}
+
 function loadFavorites(): ChannelWithStream[] {
   try {
-    return JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]");
+    const raw = JSON.parse(localStorage.getItem(FAVORITES_KEY) || "[]");
+    if (!Array.isArray(raw)) return [];
+    return raw.filter(isValidChannel);
   } catch {
     return [];
   }
