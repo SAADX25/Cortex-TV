@@ -4,15 +4,26 @@
    retry logic, and detailed error categorisation.
    ────────────────────────────────────────────────── */
 
-import { useRef, useEffect, useState, useCallback } from "react";
+import { useRef, useEffect, useState, useCallback, useMemo, useDeferredValue, memo } from "react";
 import Hls from "hls.js";
 import { Capacitor } from "@capacitor/core";
+import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "../hooks/useIPTV";
 import { resolveStream } from "../utils/StreamResolver";
 
 interface PlayerProps {
   channel: ChannelWithStream;
   onClose: () => void;
+  /** Channels to display in the sidebar panel (Famelack layout, desktop only) */
+  sidebarChannels?: ChannelWithStream[];
+  sidebarCountryName?: string;
+  sidebarLoading?: boolean;
+  sidebarError?: string | null;
+  favorites?: ChannelWithStream[];
+  onToggleFavorite?: (ch: ChannelWithStream) => void;
+  onPlayChannel?: (ch: ChannelWithStream) => void;
+  /** Called by the green back button in the sidebar header */
+  onBack?: () => void;
 }
 
 /*
@@ -292,7 +303,128 @@ function categoriseError(details: string, country?: string): {
   };
 }
 
-export default function Player({ channel, onClose }: PlayerProps) {
+/* ── Country flag CDN helper (same as ChannelList) ── */
+const FLAG_CODE_MAP: Record<string, string> = { uk: "gb" };
+const sidebarFlagUrl = (iso: string) => {
+  const code = iso.toLowerCase();
+  return `https://flagcdn.com/w40/${FLAG_CODE_MAP[code] ?? code}.png`;
+};
+
+/* ── Strip geo-block noise from channel names ── */
+const CLEAN_RE = /\[geo[- ]?blocked\]|\[blocked\]|\[not 24\/7\]/gi;
+
+/* ── Fallback TV icon for sidebar rows ── */
+function SidebarFallbackIcon() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+      className="text-white/30"
+    >
+      <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
+      <polyline points="17 2 12 7 7 2" />
+    </svg>
+  );
+}
+
+/* ── Sidebar channel row (Famelack style, memoised to skip re-renders) ── */
+const SidebarRow = memo(function SidebarRow({
+  ch,
+  isActive,
+  onPlay,
+}: {
+  ch: ChannelWithStream;
+  isActive: boolean;
+  onPlay: () => void;
+}) {
+  const displayName = ch.name.replace(CLEAN_RE, "").replace(/\s{2,}/g, " ").trim();
+  const categoryLabel = ch.categories[0]?.toUpperCase().substring(0, 8) || "";
+
+  return (
+    <div
+      role="button"
+      tabIndex={ch.streamUrl ? 0 : -1}
+      onClick={() => ch.streamUrl && onPlay()}
+      onKeyDown={(e) => {
+        if ((e.key === "Enter" || e.key === " ") && ch.streamUrl) {
+          e.preventDefault();
+          onPlay();
+        }
+      }}
+      aria-disabled={!ch.streamUrl}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mx-2 my-[3px] select-none outline-none transition-colors focus-visible:ring-1 focus-visible:ring-blue-400/50 ${
+        isActive
+          ? "bg-blue-400 cursor-default"
+          : ch.streamUrl
+            ? "cursor-pointer hover:bg-gray-800/70"
+            : "opacity-40 cursor-not-allowed"
+      }`}
+    >
+      {/* Logo / Flag */}
+      <div className={`shrink-0 h-8 w-8 rounded overflow-hidden flex items-center justify-center ${
+        isActive ? "bg-blue-300/30" : "bg-white/[0.06]"
+      }`}>
+        {ch.country ? (
+          <img
+            src={sidebarFlagUrl(ch.country)}
+            alt={ch.country}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            onError={(e) => {
+              const img = e.target as HTMLImageElement;
+              if (ch.logo && img.src !== ch.logo) {
+                img.src = ch.logo;
+              } else {
+                img.style.display = "none";
+              }
+            }}
+          />
+        ) : ch.logo ? (
+          <img
+            src={ch.logo}
+            alt=""
+            className="w-full h-full object-contain p-0.5"
+            loading="lazy"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
+        ) : (
+          <SidebarFallbackIcon />
+        )}
+      </div>
+
+      {/* Channel name */}
+      <span className={`flex-1 text-sm font-medium truncate ${isActive ? "text-black font-semibold" : "text-white/90"}`}>
+        {displayName}
+      </span>
+
+      {/* Category tag */}
+      {categoryLabel && (
+        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+          isActive ? "bg-blue-500/20 text-blue-900" : "text-white/30"
+        }`}>
+          {categoryLabel}
+        </span>
+      )}
+
+      {/* Offline indicator */}
+      {!ch.streamUrl && (
+        <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-white/10" />
+      )}
+    </div>
+  );
+});
+
+export default function Player({
+  channel,
+  onClose,
+  sidebarChannels,
+  sidebarCountryName,
+  sidebarLoading,
+  sidebarError,
+  favorites,
+  onToggleFavorite,
+  onPlayChannel,
+  onBack,
+}: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);        // mobile <video>
   const desktopVideoRef = useRef<HTMLVideoElement>(null);  // desktop <video>
   const hlsRef = useRef<Hls | null>(null);
@@ -306,6 +438,47 @@ export default function Player({ channel, onClose }: PlayerProps) {
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
   const MAX_RETRIES = 2;
+
+  /* ── Live clock for sidebar header (updates every 30 s) ── */
+  const [currentTime, setCurrentTime] = useState(() =>
+    new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })
+  );
+  useEffect(() => {
+    const t = setInterval(() =>
+      setCurrentTime(new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })),
+      30_000
+    );
+    return () => clearInterval(t);
+  }, []);
+
+  /* ── Is the current channel a favourite? ── */
+  const isFav = useMemo(
+    () => favorites?.some((f) => f.id === channel.id) ?? false,
+    [favorites, channel.id]
+  );
+
+  /* ── Sidebar search state ── */
+  const [sidebarSearch, setSidebarSearch] = useState("");
+
+  /*
+   * useDeferredValue lets React keep the input snappy at high priority while
+   * deferring the expensive filter + Virtuoso re-render to a lower-priority
+   * update. The input always reflects what you typed; the list catches up
+   * one frame later without blocking the keystroke.
+   */
+  const deferredSearch = useDeferredValue(sidebarSearch);
+
+  /* ── Filtered sidebar channels — only recomputes when deferredSearch settles ── */
+  const filteredSidebarChannels = useMemo(() => {
+    if (!sidebarChannels) return [];
+    const q = deferredSearch.trim().toLowerCase();
+    if (!q) return sidebarChannels;
+    return sidebarChannels.filter(
+      (ch) =>
+        ch.name.toLowerCase().includes(q) ||
+        ch.categories.some((c) => c.toLowerCase().includes(q))
+    );
+  }, [sidebarChannels, deferredSearch]);
 
   /** Append a timestamped line to the on-screen debug log */
   const addDebugLine = useCallback((msg: string) => {
@@ -845,120 +1018,340 @@ export default function Player({ channel, onClose }: PlayerProps) {
       </div>
       )}
 
-      {/* ══════════ DESKTOP: full-screen overlay (unchanged) ══════════ */}
+      {/* ══════════ DESKTOP: Famelack-style side-by-side overlay ══════════ */}
       {!isMobile && (
-      <div className="absolute inset-0 z-40 bg-black">
-        {/* ── Back button ── */}
-        <button
-          onClick={onClose}
-          className="absolute top-6 left-6 z-[100] text-white bg-black/60 hover:bg-red-600 p-3 rounded-full cursor-pointer transition-colors"
-          title="Back to globe"
+      <div className="fixed inset-0 z-40 flex flex-row items-center justify-between p-6 gap-5 bg-black">
+
+        {/* ── VIDEO AREA (left / centre — flexible width) ── */}
+        <div
+          className="flex-1 relative rounded-xl overflow-hidden bg-black self-center min-w-0"
+          style={{ height: "85vh" }}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m12 19-7-7 7-7" />
-            <path d="M19 12H5" />
-          </svg>
-        </button>
-
-        {/* ── Channel info overlay ── */}
-        <div className="absolute top-6 left-20 z-[100] flex items-center gap-3 rounded-lg bg-black/60 px-4 py-2 backdrop-blur-sm">
-          {channel.logo && (
-            <img src={channel.logo} alt="" className="h-8 w-8 rounded object-contain bg-white/5" />
-          )}
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-white truncate max-w-[260px]">{channel.name}</p>
-            {channel.categories.length > 0 && (
-              <p className="text-[10px] text-cyan-400/60 uppercase tracking-wider">
-                {channel.categories.join(" · ")}
-              </p>
+          {/* ── Floating button cluster: Favourite + Close ── */}
+          <div className="absolute top-3 right-3 z-[10] flex items-center gap-2">
+            {/* Star / Favourite */}
+            {onToggleFavorite && (
+              <button
+                onClick={() => onToggleFavorite(channel)}
+                className={`p-2.5 rounded-full backdrop-blur-md border transition-all cursor-pointer active:scale-90 ${
+                  isFav
+                    ? "bg-amber-400/20 border-amber-400/40 text-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.3)]"
+                    : "bg-black/60 border-white/10 text-white/60 hover:text-amber-400 hover:border-amber-400/30 hover:bg-amber-400/10"
+                }`}
+                title={isFav ? "Remove from favourites" : "Add to favourites"}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                  fill={isFav ? "currentColor" : "none"}
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </button>
             )}
-          </div>
-        </div>
 
-        {/* ── Resolving overlay (desktop) ── */}
-        {resolving && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 animate-modal-in">
-            <div className="relative">
-              <div className="h-12 w-12 rounded-full border-2 border-purple-400/20 border-t-purple-400 animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
-              </div>
-            </div>
-            <p className="mt-5 text-sm text-white/50">Resolving secure stream…</p>
-            <p className="mt-1 text-[10px] text-white/20 font-mono max-w-xs truncate">{channel.streamUrl}</p>
+            {/* Close / X */}
+            <button
+              onClick={onClose}
+              className="p-2.5 rounded-full bg-red-500/90 hover:bg-red-500 border border-red-400/40 text-white backdrop-blur-md transition-all cursor-pointer active:scale-90 shadow-[0_0_12px_rgba(239,68,68,0.3)]"
+              title="Close player"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
-        )}
 
-        {/* ── Loading spinner (desktop) ── */}
-        {!resolving && status === "loading" && (
-          <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 animate-modal-in">
-            <div className="relative">
-              <div className="h-12 w-12 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(0,255,255,0.6)]" />
-              </div>
-            </div>
-            <p className="mt-5 text-sm text-white/50">
-              {retryCount > 0 ? `Retrying connection… (attempt ${retryCount + 1})` : "Connecting to stream…"}
-            </p>
-            <p className="mt-1 text-[10px] text-white/20 font-mono max-w-xs truncate">{channel.streamUrl}</p>
-          </div>
-        )}
-
-        {/* ── Error state (desktop) ── */}
-        {status === "error" && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-black via-black/95 to-black animate-modal-in">
-            <div className="absolute inset-0 opacity-[0.03]" style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
-              backgroundSize: "150px 150px",
-            }} />
-            <div className="relative flex flex-col items-center text-center px-8 max-w-lg">
-              <div className="relative mb-6">
-                <div className="absolute inset-0 -m-4 rounded-full bg-red-500/5 blur-xl animate-pulse" />
-                <div className="relative p-5 rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-sm">
-                  <BrokenTvIcon className="text-red-400/70" />
+          {/* ── Resolving overlay (desktop) ── */}
+          {resolving && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 animate-modal-in rounded-xl">
+              <div className="relative">
+                <div className="h-12 w-12 rounded-full border-2 border-purple-400/20 border-t-purple-400 animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_rgba(168,85,247,0.6)]" />
                 </div>
               </div>
-              <h2 className="text-xl font-bold text-white/80 tracking-wide">
-                {errorTitle || "Stream Offline or Geo-Blocked"}
-              </h2>
-              <div className="w-16 h-px bg-gradient-to-r from-transparent via-red-400/30 to-transparent mt-3 mb-4" />
-              <p className="text-sm text-white/35 leading-relaxed">
-                {errorMsg || "This stream could not be loaded."}
+              <p className="mt-5 text-sm text-white/50">Resolving secure stream…</p>
+              <p className="mt-1 text-[10px] text-white/20 font-mono max-w-xs truncate">{channel.streamUrl}</p>
+            </div>
+          )}
+
+          {/* ── Loading spinner (desktop) ── */}
+          {!resolving && status === "loading" && (
+            <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 animate-modal-in rounded-xl">
+              <div className="relative">
+                <div className="h-12 w-12 rounded-full border-2 border-cyan-400/20 border-t-cyan-400 animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(0,255,255,0.6)]" />
+                </div>
+              </div>
+              <p className="mt-5 text-sm text-white/50">
+                {retryCount > 0 ? `Retrying connection… (attempt ${retryCount + 1})` : "Connecting to stream…"}
               </p>
-              <div className="mt-5 flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/5 px-4 py-2">
-                {channel.logo && <img src={channel.logo} alt="" className="h-5 w-5 rounded object-contain" />}
-                <span className="text-xs text-white/40 truncate max-w-[200px]">{channel.name}</span>
-                {channel.country && <span className="text-[10px] text-white/20 uppercase">{channel.country}</span>}
-              </div>
-              <div className="flex items-center gap-3 mt-7">
-                {retryCount < MAX_RETRIES && (
-                  <button onClick={handleRetry} className="px-5 py-2.5 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-400 text-sm font-medium hover:bg-cyan-500/20 transition-all cursor-pointer flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
-                    Retry Stream
+              <p className="mt-1 text-[10px] text-white/20 font-mono max-w-xs truncate">{channel.streamUrl}</p>
+            </div>
+          )}
+
+          {/* ── Error state (desktop) ── */}
+          {status === "error" && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-gradient-to-b from-black via-black/95 to-black animate-modal-in rounded-xl">
+              <div className="absolute inset-0 opacity-[0.03]" style={{
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`,
+                backgroundSize: "150px 150px",
+              }} />
+              <div className="relative flex flex-col items-center text-center px-8 max-w-lg">
+                <div className="relative mb-6">
+                  <div className="absolute inset-0 -m-4 rounded-full bg-red-500/5 blur-xl animate-pulse" />
+                  <div className="relative p-5 rounded-2xl bg-white/[0.03] border border-white/5 backdrop-blur-sm">
+                    <BrokenTvIcon className="text-red-400/70" />
+                  </div>
+                </div>
+                <h2 className="text-xl font-bold text-white/80 tracking-wide">
+                  {errorTitle || "Stream Offline or Geo-Blocked"}
+                </h2>
+                <div className="w-16 h-px bg-gradient-to-r from-transparent via-red-400/30 to-transparent mt-3 mb-4" />
+                <p className="text-sm text-white/35 leading-relaxed">
+                  {errorMsg || "This stream could not be loaded."}
+                </p>
+                <div className="mt-5 flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/5 px-4 py-2">
+                  {channel.logo && <img src={channel.logo} alt="" className="h-5 w-5 rounded object-contain" />}
+                  <span className="text-xs text-white/40 truncate max-w-[200px]">{channel.name}</span>
+                  {channel.country && <span className="text-[10px] text-white/20 uppercase">{channel.country}</span>}
+                </div>
+                <div className="flex items-center gap-3 mt-7">
+                  {retryCount < MAX_RETRIES && (
+                    <button onClick={handleRetry} className="px-5 py-2.5 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-400 text-sm font-medium hover:bg-cyan-500/20 transition-all cursor-pointer flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
+                      Retry Stream
+                    </button>
+                  )}
+                  <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/60 text-sm font-medium hover:bg-white/10 transition-all cursor-pointer">
+                    ← Back to channels
                   </button>
+                </div>
+                {retryCount >= MAX_RETRIES && (
+                  <p className="mt-4 text-[10px] text-white/15">Max retries reached. Try a different channel.</p>
                 )}
-                <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/60 text-sm font-medium hover:bg-white/10 transition-all cursor-pointer">
-                  ← Back to channels
-                </button>
               </div>
-              {retryCount >= MAX_RETRIES && (
-                <p className="mt-4 text-[10px] text-white/15">Max retries reached. Try a different channel.</p>
+            </div>
+          )}
+
+          {/* ── Video element (desktop) ── */}
+          <video
+            ref={desktopVideoRef}
+            className="w-full h-full object-contain bg-black"
+            style={{ objectFit: "contain" }}
+            controls
+            autoPlay
+            playsInline
+            onPlaying={handlePlaying}
+          />
+
+          {/* ── Debug log toggle ── */}
+          <button
+            onClick={() => setShowDebug((p) => !p)}
+            className="absolute bottom-3 right-3 z-[20] bg-black/70 text-[9px] text-yellow-400/60 hover:text-yellow-400 px-2 py-1 rounded border border-yellow-500/20 transition-colors"
+          >
+            {showDebug ? "Hide Log" : "🐛"}
+          </button>
+          {showDebug && (
+            <div className="absolute inset-x-0 bottom-8 z-[20] max-h-[35%] overflow-y-auto bg-black/90 border-t border-yellow-500/30 p-2 rounded-b-xl">
+              {debugLog.length === 0 ? (
+                <p className="text-[9px] text-white/30">No log entries yet…</p>
+              ) : debugLog.map((line, i) => (
+                <p key={i} className="text-[9px] text-green-400/80 font-mono leading-relaxed">{line}</p>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── SIDEBAR (right — ~30% width) ── */}
+        <div
+          className="w-[30%] min-w-[260px] max-w-[400px] bg-[#1a1a1a]/[0.97] rounded-xl flex flex-col overflow-hidden self-center border border-white/[0.06] shadow-2xl"
+          style={{ height: "85vh" }}
+        >
+          {/* Sidebar header */}
+          <div className="shrink-0 flex items-center gap-3 px-4 py-4 border-b border-white/[0.06]">
+            {/* Green back button */}
+            <button
+              onClick={onBack ?? onClose}
+              className="shrink-0 h-9 w-9 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white transition-colors cursor-pointer active:scale-90 shadow-[0_0_10px_rgba(16,185,129,0.35)]"
+              title="Back"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+
+            {/* Country / playlist name */}
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-bold text-[15px] truncate leading-tight">
+                {sidebarCountryName ?? channel.country ?? "Channels"}
+              </p>
+              {channel.country && sidebarCountryName && sidebarCountryName !== channel.country && (
+                <p className="text-white/40 text-xs truncate">{channel.country}</p>
               )}
             </div>
-          </div>
-        )}
 
-        {/* ── Video element (desktop) ── */}
-        <video
-          ref={desktopVideoRef}
-          className="w-full h-full object-contain bg-black"
-          style={{ objectFit: "contain" }}
-          controls
-          autoPlay
-          playsInline
-          onPlaying={handlePlaying}
-        />
+            {/* Live clock */}
+            <span className="shrink-0 text-white/50 text-sm font-mono tabular-nums">
+              {currentTime}
+            </span>
+          </div>
+
+          {/* ── Sidebar search bar ── */}
+          {sidebarChannels && sidebarChannels.length > 0 && !sidebarLoading && (
+            <div className="shrink-0 px-3 py-2.5 border-b border-white/[0.07]">
+              <div className={`relative flex items-center rounded-lg overflow-hidden transition-all duration-200 ${
+                sidebarSearch
+                  ? "ring-1 ring-blue-500/50 bg-[#1c2a3a]"
+                  : "bg-[#252525] hover:bg-[#2a2a2a] focus-within:ring-1 focus-within:ring-blue-500/40 focus-within:bg-[#1c2a3a]"
+              }`}>
+                {/* Search icon */}
+                <div className="absolute left-0 top-0 bottom-0 w-11 flex items-center justify-center pointer-events-none shrink-0">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className={`transition-colors duration-200 ${sidebarSearch ? "text-blue-400" : "text-white/30"}`}
+                  >
+                    <circle cx="11" cy="11" r="8" />
+                    <path d="m21 21-4.3-4.3" />
+                  </svg>
+                </div>
+
+                <input
+                  type="text"
+                  inputMode="search"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={sidebarSearch}
+                  onChange={(e) => setSidebarSearch(e.target.value)}
+                  placeholder="Search channels…"
+                  className="w-full bg-transparent pl-11 pr-10 py-3 text-[13.5px] text-white/90 placeholder-white/20 outline-none caret-blue-400 font-medium"
+                />
+
+                {/* Right side: result count pill OR clear button */}
+                <div className="absolute right-0 top-0 bottom-0 flex items-center pr-3">
+                  {sidebarSearch ? (
+                    <button
+                      onClick={() => setSidebarSearch("")}
+                      className="flex items-center justify-center h-6 w-6 rounded-full bg-white/[0.10] hover:bg-red-500/80 text-white/40 hover:text-white transition-all duration-150 active:scale-90 cursor-pointer"
+                      aria-label="Clear search"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <kbd className="hidden text-[9px] text-white/15 font-mono border border-white/10 rounded px-1 py-0.5 sm:inline">
+                      /
+                    </kbd>
+                  )}
+                </div>
+              </div>
+
+              {/* Result count — inline below, only while filtering */}
+              {sidebarSearch && (
+                <div className="flex items-center justify-between mt-1.5 px-1">
+                  <span className="text-[10.5px] text-white/30 font-medium">
+                    {filteredSidebarChannels.length === 0
+                      ? "No matches"
+                      : `${filteredSidebarChannels.length} channel${filteredSidebarChannels.length !== 1 ? "s" : ""} found`
+                    }
+                  </span>
+                  {/* Stale indicator — shows briefly while deferred search catches up */}
+                  {sidebarSearch !== deferredSearch && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Sidebar body: channel list ── */}
+          {sidebarLoading ? (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-7 w-7 rounded-full border-2 border-blue-400/30 border-t-blue-400 animate-spin" />
+                <span className="text-xs text-white/30">Loading channels…</span>
+              </div>
+            </div>
+          ) : sidebarError ? (
+            <div className="flex-1 flex items-center justify-center px-5">
+              <p className="text-sm text-red-400/70 text-center">{sidebarError}</p>
+            </div>
+          ) : sidebarChannels && sidebarChannels.length > 0 ? (
+            filteredSidebarChannels.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6 mt-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  className="text-white/20"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+                <p className="text-sm text-gray-400">No channels match</p>
+                <button
+                  onClick={() => setSidebarSearch("")}
+                  className="text-[12px] text-blue-400/70 hover:text-blue-400 underline underline-offset-2 transition-colors cursor-pointer"
+                >
+                  Clear search
+                </button>
+              </div>
+            ) : (
+            <div className="flex-1 overflow-hidden">
+              <Virtuoso
+                style={{ height: "100%" }}
+                totalCount={filteredSidebarChannels.length}
+                itemContent={(index) => {
+                  const ch = filteredSidebarChannels[index];
+                  if (!ch) return null;
+                  return (
+                    <SidebarRow
+                      ch={ch}
+                      isActive={ch.id === channel.id}
+                      onPlay={() => onPlayChannel?.(ch)}
+                    />
+                  );
+                }}
+                overscan={{ main: 200, reverse: 100 }}
+                className="scrollbar-thin"
+              />
+            </div>
+            )
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-5">
+              <div className="text-3xl opacity-40">📡</div>
+              <p className="text-sm text-white/30">No channels available.</p>
+            </div>
+          )}
+
+          {/* Sidebar footer: channel count */}
+          {sidebarChannels && !sidebarLoading && (
+            <div className="shrink-0 px-4 py-2.5 border-t border-white/[0.05] flex items-center justify-between">
+              <span className="text-[11px] text-white/25 font-medium">
+                {sidebarSearch
+                  ? `${filteredSidebarChannels.length} of ${sidebarChannels.length}`
+                  : `${sidebarChannels.length} channel${sidebarChannels.length !== 1 ? "s" : ""}`
+                }
+              </span>
+              <span className="text-[11px] text-emerald-400/40 font-medium">
+                {sidebarChannels.filter((c) => c.streamUrl).length} live
+              </span>
+            </div>
+          )}
+        </div>
+
       </div>
       )}
     </>

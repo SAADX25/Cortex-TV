@@ -167,11 +167,11 @@ const ChannelRow = memo(function ChannelRow({
         }
       }}
       aria-disabled={!ch.streamUrl}
-      className={`group pointer-events-auto w-full rounded-xl border mb-2 text-left transition-all duration-200 outline-none focus-visible:ring-1 focus-visible:ring-cyan-400/50 active:scale-[0.98] ${
+      className={`group pointer-events-auto w-full rounded-xl border mb-2 text-left transition-all duration-200 outline-none focus-visible:ring-1 focus-visible:ring-blue-400/50 active:scale-[0.98] ${
         isActive
-          ? "bg-cyan-500/[0.08] border-cyan-400/25 shadow-[0_0_20px_rgba(0,255,255,0.06)]"
+          ? "bg-blue-400 border-transparent shadow-[0_2px_16px_rgba(96,165,250,0.3)]"
           : ch.streamUrl
-            ? "border-white/[0.05] bg-white/[0.02] hover:border-cyan-500/20 hover:bg-cyan-500/[0.04] hover:shadow-[0_0_16px_rgba(0,255,255,0.03)] cursor-pointer"
+            ? "border-white/[0.05] bg-white/[0.02] hover:bg-gray-800/60 hover:border-white/[0.08] cursor-pointer"
             : "border-white/[0.03] bg-white/[0.01] opacity-40 cursor-not-allowed"
       }`}
     >
@@ -179,7 +179,7 @@ const ChannelRow = memo(function ChannelRow({
       <div className="flex items-center gap-3.5 px-4 py-3">
         {/* Flag / Logo – slightly larger with rounded corners */}
         <div className={`shrink-0 h-11 w-11 rounded-lg border flex items-center justify-center overflow-hidden ${
-          isActive ? "border-cyan-400/20 bg-cyan-500/10" : "border-white/[0.06] bg-white/[0.04]"
+          isActive ? "border-blue-300/30 bg-blue-300/20" : "border-white/[0.06] bg-white/[0.04]"
         }`}>
           {ch.country ? (
             <img
@@ -228,7 +228,7 @@ const ChannelRow = memo(function ChannelRow({
           {/* Name row */}
           <div className="flex items-center gap-2">
             <p className={`text-[14px] font-semibold truncate leading-tight ${
-              isActive ? "text-cyan-300" : "text-white group-hover:text-cyan-200"
+              isActive ? "text-black" : "text-white group-hover:text-white/90"
             } transition-colors duration-200`}>
               {displayName}
             </p>
@@ -254,14 +254,16 @@ const ChannelRow = memo(function ChannelRow({
           {/* Category + status row */}
           <div className="flex items-center gap-2 mt-1">
             {ch.categories.length > 0 && (
-              <span className="text-[10px] text-white/30 font-medium uppercase tracking-wider truncate">
-                {ch.categories.slice(0, 2).join(" · ")}
+              <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+                isActive ? "bg-blue-300/25 text-blue-900" : "text-white/30"
+              }`}>
+                {ch.categories[0].substring(0, 8)}
               </span>
             )}
             {isActive && (
-              <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-cyan-400/10 border border-cyan-400/15">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_4px_rgba(0,255,255,0.6)]" />
-                <span className="text-[8px] text-cyan-400/80 font-bold uppercase tracking-wider">Playing</span>
+              <span className="shrink-0 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-300/20">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-900 animate-pulse" />
+                <span className="text-[8px] text-blue-900 font-bold uppercase tracking-wider">Playing</span>
               </span>
             )}
           </div>
@@ -296,7 +298,9 @@ const ChannelRow = memo(function ChannelRow({
               onToggleFav();
             }}
             className={`p-1.5 rounded-lg transition-all cursor-pointer active:scale-90 ${
-              isFav ? "bg-cyan-400/10 hover:bg-cyan-400/20" : "hover:bg-white/[0.06]"
+              isFav
+                ? isActive ? "bg-black/10 hover:bg-black/20" : "bg-amber-400/10 hover:bg-amber-400/20"
+                : isActive ? "hover:bg-black/10" : "hover:bg-white/[0.06]"
             }`}
             title={isFav ? "Remove from favorites" : "Add to favorites"}
           >
@@ -305,12 +309,12 @@ const ChannelRow = memo(function ChannelRow({
               width="14"
               height="14"
               viewBox="0 0 24 24"
-              fill={isFav ? "#22d3ee" : "none"}
-              stroke={isFav ? "#22d3ee" : "currentColor"}
+              fill={isFav ? (isActive ? "#1e3a5f" : "#fbbf24") : "none"}
+              stroke={isFav ? (isActive ? "#1e3a5f" : "#fbbf24") : (isActive ? "#1e3a5f" : "currentColor")}
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={isFav ? "text-cyan-400 drop-shadow-[0_0_4px_rgba(34,211,238,0.4)]" : "text-white/20"}
+              className={isFav ? "drop-shadow-[0_0_3px_rgba(251,191,36,0.3)]" : isActive ? "text-blue-900/50" : "text-white/20"}
             >
               <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>
@@ -318,9 +322,13 @@ const ChannelRow = memo(function ChannelRow({
 
           {/* Stream status dot */}
           {ch.streamUrl ? (
-            <div className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] ring-2 ring-emerald-400/10" />
+            <div className={`h-2.5 w-2.5 rounded-full ring-2 ${
+              isActive
+                ? "bg-blue-900/60 ring-blue-900/20"
+                : "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)] ring-emerald-400/10"
+            }`} />
           ) : (
-            <span className="text-[9px] text-white/15 font-medium uppercase tracking-wider">off</span>
+            <span className={`text-[9px] font-medium uppercase tracking-wider ${isActive ? "text-blue-900/50" : "text-white/15"}`}>off</span>
           )}
         </div>
       </div>

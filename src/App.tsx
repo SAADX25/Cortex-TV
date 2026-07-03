@@ -224,6 +224,25 @@ export default function App() {
   /* ── Scene visibility (persistent mount, render loop paused when hidden) ── */
   const sceneVisible = activeTab === 'globe' && !isPlaylistMode && !playingChannel;
 
+  /* ── Derive active channels for the Player sidebar (Famelack layout) ── */
+  const sidebarChannels =
+    activeTab === "favorites" ? favorites :
+    activeTab === "news" ? newsChannels :
+    isPlaylistMode ? playlistChannels :
+    channels;
+
+  const sidebarCountryName =
+    activeTab === "favorites" ? "Favorite Channels" :
+    activeTab === "news" ? "Quick News" :
+    isPlaylistMode ? "Custom Playlist" :
+    selectedCountry?.name ?? "Channels";
+
+  const sidebarLoading =
+    activeTab === "news" ? newsLoading : loading;
+
+  const sidebarError =
+    activeTab === "news" ? null : error;
+
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden overscroll-none">
       {/* ── Conditional fake status bar: shown on sub-screens only, hidden on the
@@ -408,7 +427,7 @@ export default function App() {
       )}
 
       {/* ── Custom Playlist Sidebar ── */}
-      {isPlaylistMode && activeTab === "globe" && (
+      {isPlaylistMode && activeTab === "globe" && !playingChannel && (
         <ChannelList
           countryName="Custom Playlist"
           channels={playlistChannels}
@@ -421,13 +440,13 @@ export default function App() {
           }}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
-          isPlaying={!!playingChannel}
-          playingChannelId={playingChannel?.id ?? null}
+          isPlaying={false}
+          playingChannelId={null}
         />
       )}
 
       {/* ── Channel Sidebar (Globe mode) ── */}
-      {selectedCountry && activeTab === "globe" && !isPlaylistMode && (
+      {selectedCountry && activeTab === "globe" && !isPlaylistMode && !playingChannel && (
         <ChannelList
           countryName={selectedCountry.name}
           channels={channels}
@@ -440,13 +459,13 @@ export default function App() {
           }}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
-          isPlaying={!!playingChannel}
-          playingChannelId={playingChannel?.id ?? null}
+          isPlaying={false}
+          playingChannelId={null}
         />
       )}
 
       {/* ── Favorites Sidebar ── */}
-      {activeTab === "favorites" && (
+      {activeTab === "favorites" && !playingChannel && (
         <ChannelList
           countryName="Favorite Channels"
           channels={favorites}
@@ -455,13 +474,13 @@ export default function App() {
           onPlayChannel={playChannel}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
-          isPlaying={!!playingChannel}
-          playingChannelId={playingChannel?.id ?? null}
+          isPlaying={false}
+          playingChannelId={null}
         />
       )}
 
       {/* ── Quick Access News Sidebar ── */}
-      {activeTab === "news" && (
+      {activeTab === "news" && !playingChannel && (
         <ChannelList
           countryName="Quick Access News"
           channels={newsChannels}
@@ -471,14 +490,25 @@ export default function App() {
           onClose={() => setActiveTab("globe")}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
-          isPlaying={!!playingChannel}
-          playingChannelId={playingChannel?.id ?? null}
+          isPlaying={false}
+          playingChannelId={null}
         />
       )}
 
       {/* ── Video Player ── */}
       {playingChannel && (
-        <Player channel={playingChannel} onClose={closePlayer} />
+        <Player
+          channel={playingChannel}
+          onClose={closePlayer}
+          sidebarChannels={sidebarChannels}
+          sidebarCountryName={sidebarCountryName}
+          sidebarLoading={sidebarLoading}
+          sidebarError={sidebarError}
+          favorites={favorites}
+          onToggleFavorite={toggleFavorite}
+          onPlayChannel={playChannel}
+          onBack={closePlayer}
+        />
       )}
 
       {/* ── Global Search Modal ── */}
