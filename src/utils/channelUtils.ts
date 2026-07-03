@@ -5,16 +5,31 @@
    ChannelList, Player, and SearchModal to avoid drift.
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/** Map ISO codes that differ between iptv-org and flagcdn */
-export const FLAG_CODE_MAP: Record<string, string> = { uk: "gb" };
+/** Map IPTV/country codes to the bundled classic_3_ico filenames. */
+export const FLAG_CODE_MAP: Record<string, string> = {
+  bq: "nl",
+  cw: "curacao",
+  gb: "uk",
+  gf: "fr",
+  gp: "fr",
+  hm: "au",
+  pm: "fr",
+  re: "fr",
+  sj: "no",
+  sx: "sint_maarten",
+  um: "us",
+  vg: "uk",
+  vi: "us",
+  xk: "kosovo",
+};
 
 /**
- * Returns a flagcdn.com URL for a given ISO alpha-2 code.
- * Handles ukâ†’gb normalisation.
+ * Returns a bundled classic_3_ico flag URL for a given country code.
  */
 export function flagUrl(iso: string, width: 20 | 40 | 80 = 40): string {
+  void width;
   const code = iso.toLowerCase();
-  return `https://flagcdn.com/w${width}/${FLAG_CODE_MAP[code] ?? code}.png`;
+  return `icons/classic_3_ico/classic_3_ico/${FLAG_CODE_MAP[code] ?? code}.ico`;
 }
 
 /**

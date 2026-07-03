@@ -80,26 +80,6 @@ function CloseIcon() {
   );
 }
 
-function categoryIcon(value: string) {
-  if (value === "sports") return "Trophy";
-  if (value === "movies") return "Film";
-  if (value === "music") return "Music";
-  if (value === "news") return "News";
-  if (value === "kids") return "Kids";
-  if (value === "entertainment") return "Spark";
-  return "All";
-}
-
-function MiniIcon({ name }: { name: string }) {
-  const common = { xmlns: "http://www.w3.org/2000/svg", width: 14, height: 14, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" } as const;
-  if (name === "Trophy") return <svg {...common}><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></svg>;
-  if (name === "Film") return <svg {...common}><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M7 3v18" /><path d="M17 3v18" /><path d="M3 12h18" /></svg>;
-  if (name === "Music") return <svg {...common}><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>;
-  if (name === "News") return <svg {...common}><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Z" /><path d="M18 14h-8" /><path d="M10 6h8v4h-8V6Z" /></svg>;
-  if (name === "Kids") return <svg {...common}><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><path d="M9 9h.01" /><path d="M15 9h.01" /></svg>;
-  if (name === "Spark") return <svg {...common}><path d="M12 2v6" /><path d="M12 16v6" /><path d="M2 12h6" /><path d="M16 12h6" /></svg>;
-  return <svg {...common}><circle cx="12" cy="12" r="10" /><path d="M2 12h20" /></svg>;
-}
 
 function Logo({ channel, active }: { channel: ChannelWithStream; active: boolean }) {
   return (
@@ -267,10 +247,6 @@ export default function ChannelList({
     };
   }, [channels]);
 
-  const categoryChips = useMemo(() => [
-    { value: null, label: "All", count: channels.length },
-    ...filterOptions.categories.slice(0, 6),
-  ], [channels.length, filterOptions.categories]);
 
   const filtered = useMemo(() => {
     const query = normalizeSearchText(deferredSearch);
@@ -374,18 +350,6 @@ export default function ChannelList({
           </button>
         </div>
 
-        <div className="mt-3 flex gap-2 overflow-x-auto no-scrollbar">
-          {categoryChips.map((chip) => {
-            const active = filters.category === chip.value || (!filters.category && chip.value === null);
-            return (
-              <button key={chip.value ?? "all"} type="button" onClick={() => setFilters((prev) => ({ ...prev, category: chip.value }))} className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition-all ${active ? "bg-cyan-300 text-slate-950" : "bg-white/[0.06] text-white/64 hover:bg-white/[0.1]"}`}>
-                <MiniIcon name={categoryIcon(chip.value ?? "all")} />
-                <span className="font-semibold">{chip.label}</span>
-                <span className="opacity-70">{chip.count}</span>
-              </button>
-            );
-          })}
-        </div>
 
         <div className="mt-3 hidden md:block">{filterPanel}</div>
         {showMobileFilters && <div className="mt-3 md:hidden">{filterPanel}</div>}

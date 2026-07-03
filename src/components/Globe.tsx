@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import GlobeGL from "react-globe.gl";
 import * as THREE from "three";
 import Crosshair from "./Crosshair";
+import { flagUrl } from "../utils/channelUtils";
 
 /* ── GeoJSON point-in-polygon (ray-casting) ── */
 function pointInRing2D(
@@ -300,10 +301,6 @@ function isoToFlag(iso: string): string {
   );
 }
 
-/** CDN URL for a country flag SVG image (works everywhere, including Windows/Electron). */
-function flagUrl(iso: string): string {
-  return `https://flagcdn.com/w40/${iso.toLowerCase()}.png`;
-}
 
 /** Detect if the primary input is touch (mobile/tablet). */
 const IS_TOUCH_DEVICE = typeof window !== 'undefined'
