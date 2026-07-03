@@ -22,6 +22,7 @@ import type {
 let allChannels: ChannelWithStream[] = [];
 let streamUrlMap: Map<string, string> = new Map();
 let streamStatusMap: Map<string, string | null> = new Map();
+let indexedStreamCount = 0;
 let countryIndex: Map<string, ChannelWithStream[]> = new Map();
 let newsChannelsCache: ChannelWithStream[] = [];
 let searchIndex: SearchEntry[] = [];
@@ -66,7 +67,6 @@ interface SearchEntry {
   country: string;
   categories: string[];
   languages: string[];
-  haystack: string;
 }
 
 function uniqueStrings(values: unknown): string[] {
@@ -143,15 +143,6 @@ function buildSearchEntry(channel: ChannelWithStream): SearchEntry {
     ...channel.languages.map(normalizeSearchText),
     ...(channel.languageNames ?? []).map(normalizeSearchText),
   ].filter(Boolean);
-  const haystack = [
-    normalizedName,
-    nameCore,
-    ...altNames,
-    countryCode,
-    countryLabel,
-    ...categories,
-    ...languages,
-  ].filter(Boolean).join(" ");
 
   return {
     channel,
@@ -162,7 +153,6 @@ function buildSearchEntry(channel: ChannelWithStream): SearchEntry {
     country: countryLabel,
     categories,
     languages,
-    haystack,
   };
 }
 
@@ -244,7 +234,7 @@ function rebuildIndexes(): void {
 
   browseMetadata = {
     channelCount: allChannels.length,
-    streamCount: streamUrlMap.size,
+    streamCount: indexedStreamCount,
     countries: topOptionsFromMap(countryOptions, 80),
     categories: buildCategoryOptions(),
     languages: topOptionsFromMap(languageOptions, 40),
@@ -261,6 +251,7 @@ function handleInit(rawChannels: any[], rawStreams: any[]): WorkerResponse {
     streamUrlMap.set(stream.channel, stream.url ?? "");
     streamStatusMap.set(stream.channel, stream.status ?? stream.health ?? null);
   }
+  indexedStreamCount = streamUrlMap.size;
 
   allChannels = [];
   for (const raw of rawChannels) {
@@ -269,16 +260,18 @@ function handleInit(rawChannels: any[], rawStreams: any[]): WorkerResponse {
   }
 
   rebuildIndexes();
+  streamUrlMap = new Map();
+  streamStatusMap = new Map();
 
   const elapsed = (performance.now() - t0).toFixed(1);
   console.log(
-    `[Worker] Indexed ${allChannels.length} channels, ${streamUrlMap.size} streams, ${countryIndex.size} countries in ${elapsed}ms`,
+    `[Worker] Indexed ${allChannels.length} channels, ${indexedStreamCount} streams, ${countryIndex.size} countries in ${elapsed}ms`,
   );
 
   return {
     type: "INIT_COMPLETE",
     channelCount: allChannels.length,
-    streamCount: streamUrlMap.size,
+    streamCount: indexedStreamCount,
   };
 }
 

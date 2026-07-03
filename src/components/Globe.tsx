@@ -318,6 +318,15 @@ const NIGHT_SKY_URL =
   "https://unpkg.com/three-globe/example/img/night-sky.png";
 const GEOJSON_URL =
   "https://cdn.jsdelivr.net/gh/vasturiano/react-globe.gl@master/example/datasets/ne_110m_admin_0_countries.geojson";
+const GLOBE_TARGET_FPS = 20;
+const GLOBE_FRAME_MS = 1000 / GLOBE_TARGET_FPS;
+const MAX_GLOBE_PIXEL_RATIO = 1;
+const MOBILE_TARGET_INTERVAL_MS = 250;
+const GLOBE_RENDERER_CONFIG = {
+  antialias: false,
+  alpha: true,
+  powerPreference: "low-power" as WebGLPowerPreference,
+};
 
 /* ── Public types ── */
 export interface CountryInfo {
@@ -416,8 +425,20 @@ function GlobeInner({
     controls.minDistance = 150;
     controls.maxDistance = 500;
 
+    globe.renderer?.()?.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO));
+
     // Slight initial tilt for a nicer default view
     globe.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      const globe = globeRef.current;
+      const renderer = globe?.renderer?.();
+      renderer?.setAnimationLoop?.(null);
+      renderer?.dispose?.();
+      renderer?.forceContextLoss?.();
+    };
   }, []);
 
   /* ── Update rotation speed + pause state dynamically ── */
@@ -438,11 +459,15 @@ function GlobeInner({
     if (!globe) return;
     const renderer = globe.renderer?.();
     if (!renderer) return;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO));
+    let lastFrame = 0;
 
     if (paused) {
       renderer.setAnimationLoop(null);
     } else {
-      renderer.setAnimationLoop(() => {
+      renderer.setAnimationLoop((time: number = performance.now()) => {
+        if (time - lastFrame < GLOBE_FRAME_MS) return;
+        lastFrame = time;
         const ctrl = globe.controls?.();
         if (ctrl) ctrl.update();
         renderer.render(globe.scene(), globe.camera());
@@ -677,9 +702,13 @@ function GlobeInner({
   useEffect(() => {
     if (!IS_TOUCH_DEVICE || paused) return;
     let active = true;
-    const loop = () => {
+    let lastUpdate = 0;
+    const loop = (time: number = performance.now()) => {
       if (!active) return;
-      updateTargetLabel();
+      if (time - lastUpdate >= MOBILE_TARGET_INTERVAL_MS) {
+        lastUpdate = time;
+        updateTargetLabel();
+      }
       rafIdRef.current = requestAnimationFrame(loop);
     };
     rafIdRef.current = requestAnimationFrame(loop);
@@ -900,15 +929,18 @@ function GlobeInner({
         ref={globeRef}
         width={dimensions.width}
         height={dimensions.height}
+        rendererConfig={GLOBE_RENDERER_CONFIG}
         /* ── Textures ── */
         globeImageUrl={isNightMode ? GLOBE_NIGHT_URL : GLOBE_DAY_URL}
-        bumpImageUrl={BUMP_IMAGE_URL}
+        bumpImageUrl={undefined}
         /* ── Scene ── */
         backgroundColor="rgba(0,0,0,0)"
-        backgroundImageUrl={isNightMode ? NIGHT_SKY_URL : undefined}
+        backgroundImageUrl={undefined}
+        enablePointerInteraction={!paused}
+        showAtmosphere={false}
         atmosphereColor={isNightMode ? "#0066cc" : "#00bfff"}
         atmosphereAltitude={atmosphereIntensity}
-        animateIn={true}
+        animateIn={false}
         /* ── Country polygons ── */
         polygonsData={countries}
         polygonCapColor={() =>
@@ -917,12 +949,13 @@ function GlobeInner({
         polygonSideColor={() => paused ? "rgba(0,0,0,0)" : "rgba(0, 255, 255, 0.05)"}
         polygonStrokeColor={() => paused ? "rgba(0,0,0,0)" : "#00ffff"}
         polygonAltitude={() => 0.005}
+        polygonCapCurvatureResolution={1}
         polygonLabel={() => ''}
         /* ── Interaction ── */
         onPolygonHover={handlePolygonHover}
         onPolygonClick={handlePolygonClick}
         /* ── Performance ── */
-        polygonsTransitionDuration={paused ? 0 : 300}
+        polygonsTransitionDuration={0}
       />
     </div>
   );

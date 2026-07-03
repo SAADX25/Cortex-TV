@@ -654,11 +654,15 @@ export default function Player({
 
     hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
-        /* ── Thermal / memory tuning ── */
-        maxBufferLength: 30,          // keep at most 30 s of buffer in RAM
-        maxMaxBufferLength: 30,       // hard ceiling – cap at 30 s to save battery & network
-        maxBufferSize: 30 * 1000 * 1000, // ~30 MB source buffer cap
+        lowLatencyMode: false,
+        capLevelToPlayerSize: true,
+        /* Low-memory live playback tuning */
+        maxBufferLength: 10,
+        maxMaxBufferLength: 12,
+        maxBufferSize: 12 * 1000 * 1000,
+        backBufferLength: 0,
+        liveBackBufferLength: 0,
+        maxBufferHole: 0.5,
         fragLoadingMaxRetry: 5,
         manifestLoadingMaxRetry: 4,
         levelLoadingMaxRetry: 4,

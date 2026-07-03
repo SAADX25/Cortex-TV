@@ -179,3 +179,32 @@ body {
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
 }
+
+.cortex-starfield {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 17px 31px, rgba(255,255,255,0.86) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 89px 119px, rgba(180,230,255,0.7) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 191px 73px, rgba(255,255,255,0.52) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 311px 181px, rgba(134,211,255,0.42) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 421px 47px, rgba(255,255,255,0.34) 0 1px, transparent 1.4px),
+    radial-gradient(circle at 49px 271px, rgba(255,255,255,0.28) 0 1px, transparent 1.6px);
+  background-size: 233px 233px, 317px 317px, 389px 389px, 503px 503px, 619px 619px, 719px 719px;
+  background-position: 0 0, 31px 17px, 59px 83px, 103px 41px, 149px 131px, 211px 67px;
+  opacity: 0.82;
+}
+
+.cortex-starfield::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 33% 24%, rgba(255,255,255,0.95) 0 1.4px, transparent 2.4px),
+    radial-gradient(circle at 71% 32%, rgba(170,226,255,0.74) 0 1.2px, transparent 2.2px),
+    radial-gradient(circle at 58% 74%, rgba(255,255,255,0.62) 0 1.2px, transparent 2.1px),
+    radial-gradient(circle at 24% 68%, rgba(190,232,255,0.52) 0 1px, transparent 2px);
+  opacity: 0.55;
+}

@@ -174,6 +174,16 @@ function sendInitToWorker(rawChannels: any[], rawStreams: any[]): Promise<InitSt
 
 let activeChHash = "";
 let activeStHash = "";
+const CACHE_REVALIDATE_DELAY_MS = 5 * 60 * 1000;
+let revalidateTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleRevalidateInBackground(): void {
+  if (revalidateTimer) return;
+  revalidateTimer = setTimeout(() => {
+    revalidateTimer = null;
+    revalidateInBackground();
+  }, CACHE_REVALIDATE_DELAY_MS);
+}
 
 async function revalidateInBackground(): Promise<void> {
   emitStatus({
@@ -274,7 +284,7 @@ export function ensureWorkerData(): Promise<void> {
         updatedAt: cachedCh.ts,
         error: null,
       });
-      revalidateInBackground();
+      scheduleRevalidateInBackground();
       return;
     }
 
