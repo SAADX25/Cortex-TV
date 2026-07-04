@@ -804,7 +804,7 @@ function GlobeInner({
         onTouchEnd={killEvent}
         onPointerDown={killEvent}
         onClick={(e) => { e.stopPropagation(); setUiLang((l) => (l === "en" ? "ar" : "en")); }}
-        className="fixed top-[4.5rem] left-4 z-50 md:hidden flex items-center justify-center
+        className="fixed top-[4.5rem] mobile-safe-floating-top left-4 z-50 md:hidden flex items-center justify-center
                    h-10 w-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10
                    text-white/60 hover:text-cyan-400 active:scale-90 transition-all shadow-lg"
         aria-label={uiLang === "en" ? "Switch to Arabic" : "Switch to English"}
@@ -836,7 +836,7 @@ function GlobeInner({
 
       {/* ── Country Info Badge (iOS Glassmorphism) ── */}
       <div
-        className={`fixed top-14 left-1/2 -translate-x-1/2 z-50 pointer-events-none
+        className={`fixed top-14 mobile-safe-badge-top left-1/2 -translate-x-1/2 z-50 pointer-events-none
                     transition-all duration-200 origin-top
                     ${targetedCountry
                       ? "opacity-100 scale-100"

@@ -852,7 +852,7 @@ export default function Player({
         {/* ── Floating Close / Back button (always visible) ── */}
         <button
           onClick={onClose}
-          className="absolute top-[max(env(safe-area-inset-top),3rem)] left-4 z-[10000] bg-black/70 text-white p-3 rounded-full backdrop-blur-md cursor-pointer active:scale-90 transition-transform shadow-lg"
+          className="absolute top-[max(var(--cortex-safe-top),3rem)] left-4 z-[10000] bg-black/70 text-white p-3 rounded-full backdrop-blur-md cursor-pointer active:scale-90 transition-transform shadow-lg"
           aria-label="Close player"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -979,8 +979,8 @@ export default function Player({
 
         {/* ── Control bar beneath video ── */}
         <div className={isLandscape
-          ? "absolute top-0 inset-x-0 z-10 flex items-center gap-3 px-4 py-3 pt-[max(env(safe-area-inset-top),3rem)] bg-gradient-to-b from-black/80 to-transparent"
-          : "relative z-[3] flex items-center gap-3 px-3 py-2 pt-[max(env(safe-area-inset-top),0.5rem)] bg-black/90 backdrop-blur-md border-b border-white/5 shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
+          ? "absolute top-0 inset-x-0 z-10 flex items-center gap-3 px-4 py-3 pt-[max(var(--cortex-safe-top),3rem)] bg-gradient-to-b from-black/80 to-transparent"
+          : "relative z-[3] flex items-center gap-3 px-3 py-2 pt-[max(var(--cortex-safe-top),0.5rem)] bg-black/90 backdrop-blur-md border-b border-white/5 shadow-[0_2px_8px_rgba(0,0,0,0.5)]"
         }>
           {/* Channel logo */}
           {channel.logo && (

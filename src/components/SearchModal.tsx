@@ -41,7 +41,6 @@ interface SearchModalProps {
   open: boolean;
   onClose: () => void;
   onSelectChannel: (channel: ChannelWithStream) => void;
-  onNavigate?: (tab: "globe" | "search" | "favorites" | "settings" | "news") => void;
   initialFilters?: SearchFilters;
   favorites?: ChannelWithStream[];
   recentChannels?: ChannelWithStream[];
@@ -320,7 +319,6 @@ export default function SearchModal({
   open,
   onClose,
   onSelectChannel,
-  onNavigate,
   initialFilters,
   favorites = [],
   recentChannels = [],
@@ -344,7 +342,6 @@ export default function SearchModal({
   const activeFilterCount = countActiveFilters(filters);
   const hasQuery = query.trim().length > 0;
   const filtersActive = hasActiveFilters(filters);
-  const showHint = !searching && !hasQuery && !filtersActive;
   const showEmpty = !searching && (hasQuery || filtersActive) && results.length === 0;
   const showResults = !searching && results.length > 0;
 
@@ -462,23 +459,23 @@ export default function SearchModal({
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-start justify-center bg-black/42 px-4 pt-20 backdrop-blur-[2px] md:pt-24 ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
+      className={`fixed inset-0 z-[200] flex items-start justify-center bg-black/42 px-2 mobile-safe-modal-top backdrop-blur-[2px] sm:px-4 md:pt-24 ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) handleClose();
       }}
     >
-      <div className={`w-full max-w-[760px] overflow-hidden rounded-2xl border border-cyan-200/[0.14] bg-[#07101f]/98 shadow-[0_24px_90px_rgba(0,0,0,0.58)] ${closing ? "animate-modal-out" : "animate-modal-in"}`}>
-        <div className="bg-[#0a1628]/98 p-4 md:p-5">
-          <div className="mb-4 flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-200/70">Global search</p>
-              <h2 className="mt-1 text-xl font-bold tracking-normal text-white md:text-2xl">Find a public channel</h2>
+      <div className={`w-[calc(100%-0.75rem)] max-w-[760px] max-h-[calc(100dvh_-_var(--cortex-safe-top)_-_5.75rem)] overflow-hidden rounded-[22px] border border-cyan-200/[0.14] bg-[#07101f]/98 shadow-[0_24px_90px_rgba(0,0,0,0.58)] sm:w-full md:max-h-none md:rounded-2xl ${closing ? "animate-modal-out" : "animate-modal-in"}`}>
+        <div className="bg-[#0a1628]/98 p-3.5 md:p-5">
+          <div className="mb-3 flex items-center justify-between gap-3 md:mb-4 md:items-start md:gap-4">
+            <div className="min-w-0 pr-1">
+              <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-cyan-200/62 md:text-[10px] md:tracking-[0.24em] md:text-cyan-200/70">Global search</p>
+              <h2 className="mt-0.5 truncate text-lg font-bold leading-tight tracking-normal text-white md:mt-1 md:text-2xl">Find a public channel</h2>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
               <button
                 type="button"
                 onClick={() => setShowFilters((value) => !value)}
-                className={`relative flex h-11 w-11 items-center justify-center rounded-xl border transition-all ${showFilters ? "border-cyan-300/45 bg-cyan-300/15 text-cyan-100" : "border-white/[0.11] bg-white/[0.06] text-white/66 hover:border-cyan-300/28 hover:bg-white/[0.09] hover:text-white"}`}
+                className={`relative flex h-10 w-10 items-center justify-center rounded-[14px] border transition-all md:h-11 md:w-11 md:rounded-xl ${showFilters ? "border-cyan-300/45 bg-cyan-300/15 text-cyan-100" : "border-white/[0.11] bg-white/[0.06] text-white/66 hover:border-cyan-300/28 hover:bg-white/[0.09] hover:text-white"}`}
                 aria-label="Toggle search filters"
                 title="Filters"
               >
@@ -488,7 +485,7 @@ export default function SearchModal({
               <button
                 type="button"
                 onClick={handleClose}
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/[0.11] bg-white/[0.06] text-white/62 transition-all hover:border-white/[0.20] hover:bg-white/[0.09] hover:text-white"
+                className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-white/[0.11] bg-white/[0.06] text-white/62 transition-all hover:border-white/[0.20] hover:bg-white/[0.09] hover:text-white md:h-11 md:w-11 md:rounded-xl"
                 aria-label="Close search"
                 title="Close"
               >
@@ -497,8 +494,8 @@ export default function SearchModal({
             </div>
           </div>
 
-          <div className={`relative flex h-14 w-full items-center gap-3 rounded-2xl border px-4 transition-all md:h-16 ${focused ? "border-cyan-300/60 bg-[#172b4b] ring-4 ring-cyan-300/[0.10]" : "border-white/[0.12] bg-[#13233d] hover:border-white/[0.18]"}`}>
-            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${focused || hasQuery ? "bg-cyan-300/16 text-cyan-100" : "bg-white/[0.06] text-white/40"}`}>
+          <div className={`relative flex h-12 w-full items-center gap-2 rounded-[18px] border px-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-all md:h-16 md:gap-3 md:rounded-2xl md:px-4 ${focused ? "border-cyan-300/60 bg-[#172b4b] ring-4 ring-cyan-300/[0.10]" : "border-white/[0.12] bg-[#13233d] hover:border-white/[0.18]"}`}>
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[13px] transition-all md:h-9 md:w-9 md:rounded-xl ${focused || hasQuery ? "bg-cyan-300/16 text-cyan-100" : "bg-white/[0.06] text-white/40"}`}>
               <SearchIcon />
             </span>
             <input
@@ -512,8 +509,8 @@ export default function SearchModal({
               onChange={(event) => setQuery(event.target.value)}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              placeholder="Search channel, country, category, or language"
-              className="h-full min-w-0 flex-1 bg-transparent text-base font-semibold text-white outline-none placeholder:font-medium placeholder:text-white/40 md:text-lg"
+              placeholder="Search channels"
+              className="h-full min-w-0 flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:font-medium placeholder:text-white/40 md:text-lg"
               aria-label="Search channel, country, category, or language"
             />
             {searching && <span className="h-5 w-5 shrink-0 rounded-full border-2 border-cyan-300/20 border-t-cyan-300 animate-spin" />}
@@ -525,7 +522,7 @@ export default function SearchModal({
             <kbd className="hidden rounded-md border border-white/[0.12] bg-black/24 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-white/40 md:block">Ctrl K</kbd>
           </div>
 
-          <div className="mt-4">
+          <div className="mt-3 md:mt-4">
             <div className="mb-2 flex items-center justify-between gap-3 px-1">
               <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/38">Category</span>
               {activeFilterCount > 0 && <span className="text-xs font-semibold text-cyan-100/70">{activeFilterCount} active</span>}
@@ -538,7 +535,7 @@ export default function SearchModal({
                     key={category.value}
                     type="button"
                     onClick={() => setFilter("category", category.value === "all" ? null : category.value)}
-                    className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 text-sm transition-all ${active ? "border-cyan-200/70 bg-cyan-300 text-slate-950" : "border-white/[0.08] bg-white/[0.055] text-white/72 hover:border-cyan-300/28 hover:bg-cyan-300/[0.08] hover:text-white"}`}
+                    className={`flex h-9 min-w-0 items-center justify-center gap-2 rounded-[14px] border px-2 text-xs transition-all md:h-10 md:rounded-xl md:text-sm ${active ? "border-cyan-200/70 bg-cyan-300 text-slate-950" : "border-white/[0.08] bg-white/[0.055] text-white/72 hover:border-cyan-300/28 hover:bg-cyan-300/[0.08] hover:text-white"}`}
                   >
                     <span className={`shrink-0 ${active ? "text-slate-950" : "text-cyan-100/82"}`}>{CATEGORY_ICONS[category.value] ?? <SparkIcon />}</span>
                     <span className="truncate font-semibold">{category.label}</span>
@@ -549,17 +546,11 @@ export default function SearchModal({
           </div>
 
           {showFilters && (
-            <div className="mt-4">
+            <div className="mt-3 md:mt-4">
               <FilterPanel metadata={metadata} filters={filters} setFilter={setFilter} clearFilters={clearFilters} />
             </div>
           )}
         </div>
-
-        {showHint && (
-          <div className="border-t border-white/[0.06] bg-[#07101f] px-5 py-3 text-sm text-white/42">
-            Type to search, choose one category above, or use filters for country/language/favorites.
-          </div>
-        )}
 
         {(searching || showEmpty || showResults) && (
           <div className="border-t border-white/[0.06] bg-[#07101f] p-3 md:p-4">
@@ -611,13 +602,6 @@ export default function SearchModal({
             )}
           </div>
         )}
-
-        <div className="border-t border-white/[0.06] px-5 py-2 text-[11px] text-white/32">
-          <div className="flex items-center justify-between gap-3">
-            <span>Free public streams. Availability may change.</span>
-            <button type="button" onClick={() => onNavigate?.("globe")} className="text-cyan-100/68 hover:text-cyan-100 md:hidden">Back to globe</button>
-          </div>
-        </div>
       </div>
     </div>
   );

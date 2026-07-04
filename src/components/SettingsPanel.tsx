@@ -192,7 +192,7 @@ export default function SettingsPanel({
 
   return (
     <div
-      className={`fixed top-12 md:top-0 bottom-0 left-0 right-0 z-[190] ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
+      className={`fixed top-0 mobile-safe-panel-top md:top-0 bottom-0 left-0 right-0 z-[190] ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
     >
       {/* Dim backdrop */}
       <div className="absolute inset-0 bg-black/40" />
@@ -556,16 +556,6 @@ export default function SettingsPanel({
           </section>
         </div>
 
-        {/* ── Footer ── */}
-        <div className="px-6 py-4 pb-[max(env(safe-area-inset-bottom),1rem)] border-t border-white/[0.06]">
-          <div className="flex items-center justify-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(0,255,255,0.5)]" />
-            <span className="text-[11px] text-white/30">
-              Cortex TV &middot; Built by{" "}
-              <span className="text-cyan-400/60 font-medium">SAADX25</span>
-            </span>
-          </div>
-        </div>
       </div>
     </div>
   );

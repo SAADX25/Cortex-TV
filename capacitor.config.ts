@@ -17,6 +17,12 @@ const config: CapacitorConfig = {
       overlaysWebView: false, // This is the magic bullet!
       backgroundColor: '#0f172a', // A dark color to match the app header
       style: 'DARK' // Ensures white text for battery/time
+    },
+    SystemBars: {
+      insetsHandling: 'css',
+      style: 'DARK',
+      hidden: false,
+      animation: 'NONE'
     }
   }
 };

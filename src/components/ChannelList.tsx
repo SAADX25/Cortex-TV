@@ -314,7 +314,7 @@ export default function ChannelList({
   );
 
   return (
-    <div className={`fixed top-12 right-0 bottom-0 z-[60] flex w-full flex-col border-l border-cyan-500/15 bg-black/95 pb-24 backdrop-blur-xl md:absolute md:top-0 md:z-30 md:w-[430px] md:bg-black/82 md:pb-0 ${isPlaying ? "pt-[calc(100vw*9/16+2.5rem)] md:pt-0" : ""}`}>
+    <div className={`fixed top-0 mobile-safe-panel-top right-0 bottom-0 z-[60] flex w-full flex-col border-l border-cyan-500/15 bg-black/95 mobile-safe-panel-bottom backdrop-blur-xl md:absolute md:top-0 md:z-30 md:w-[430px] md:bg-black/82 md:pb-0 ${isPlaying ? "pt-[calc(100vw*9/16+2.5rem)] md:pt-0" : ""}`}>
       <div className="shrink-0 border-b border-white/[0.05] bg-gradient-to-b from-white/[0.045] to-transparent px-5 pb-4 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">

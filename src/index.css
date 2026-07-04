@@ -22,13 +22,77 @@ body,
   background: #000;
   font-family: "Inter", system-ui, sans-serif;
 }
+:root {
+  --cortex-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --cortex-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --cortex-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --cortex-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+}
 
-/* ── Safe-area baseline (Capacitor / notched devices) ── */
 body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
+  padding: 0;
+}
+
+.app-shell {
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
+.mobile-status-background {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobile-status-background {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--cortex-safe-top);
+    background: #0f172a;
+    pointer-events: none;
+    z-index: 99999;
+  }
+
+  .mobile-safe-panel-top {
+    top: var(--cortex-safe-top);
+  }
+
+  .mobile-safe-floating-top {
+    top: calc(var(--cortex-safe-top) + 4.5rem);
+  }
+
+  .mobile-safe-badge-top {
+    top: calc(var(--cortex-safe-top) + 3.5rem);
+  }
+
+  .mobile-safe-hud-top {
+    padding-top: calc(var(--cortex-safe-top) + 3.5rem);
+  }
+
+  .mobile-safe-hud-bottom {
+    padding-bottom: calc(var(--cortex-safe-bottom) + 3.5rem);
+  }
+
+  .mobile-safe-bottom-nav {
+    padding-bottom: var(--cortex-safe-bottom);
+  }
+
+  .mobile-safe-panel-bottom {
+    padding-bottom: calc(var(--cortex-safe-bottom) + 6rem);
+  }
+
+  .mobile-safe-modal-top {
+    padding-top: calc(var(--cortex-safe-top) + 5rem);
+  }
+}
+
+@supports not (height: 100dvh) {
+  .app-shell {
+    height: 100vh;
+    min-height: 100vh;
+  }
 }
 
 /* ── Sidebar slide-in animation ── */
