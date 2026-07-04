@@ -17,7 +17,7 @@ interface BordersProps {
 }
 
 export default function Borders({
-  geoJsonUrl = "./geo/countries.geojson",
+  geoJsonUrl = `${import.meta.env.BASE_URL}geo/countries.geojson`,
   radius = 1.002,
   opacity = 0.65,
 }: BordersProps) {

@@ -5,8 +5,10 @@ import electron from "vite-plugin-electron";
 import renderer from "vite-plugin-electron-renderer";
 import path from "node:path";
 
+const isGitHubPages = process.env.GITHUB_PAGES === "true";
+
 export default defineConfig({
-  base: "/Cortex-TV/",
+  base: isGitHubPages ? "/Cortex-TV/" : "/",
   server: {
     middlewareMode: false,
     hmr: {
