@@ -200,7 +200,7 @@ export default function SettingsPanel({
       {/* Panel */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`absolute inset-y-0 left-0 w-full md:w-[380px] max-w-full md:max-w-[85vw] flex flex-col bg-[#0f172a] md:bg-black/70 md:backdrop-blur-2xl border-r border-white/[0.06] shadow-[20px_0_60px_rgba(0,0,0,0.5)] pb-20 md:pb-0 ${animClass}`}
+        className={`absolute top-0 bottom-0 mobile-safe-panel-nav-clearance md:bottom-0 left-0 w-full md:w-[380px] max-w-full md:max-w-[85vw] flex flex-col bg-[#0f172a] md:bg-black/70 md:backdrop-blur-2xl border-r border-white/[0.06] shadow-[20px_0_60px_rgba(0,0,0,0.5)] ${animClass}`}
       >
         {/* ── Native-style Header ── */}
         <div className="flex items-center justify-center px-6 pt-4 md:pt-6 pb-4 border-b border-white/[0.06]">
@@ -210,7 +210,7 @@ export default function SettingsPanel({
         </div>
 
         {/* ── Content ── */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-5 py-5 pb-28 md:pb-5 space-y-6">
+        <div className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-5 pt-5 pb-6 md:pb-5 space-y-6">
 
           {/* ══ Globe Controls Card ══ */}
           <section>

@@ -83,6 +83,10 @@ body {
     padding-bottom: calc(var(--cortex-safe-bottom) + 6rem);
   }
 
+  .mobile-safe-panel-nav-clearance {
+    bottom: calc(var(--cortex-safe-bottom) + 3.5rem);
+  }
+
   .mobile-safe-modal-top {
     padding-top: calc(var(--cortex-safe-top) + 5rem);
   }
