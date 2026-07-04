@@ -6,9 +6,10 @@ import renderer from "vite-plugin-electron-renderer";
 import path from "node:path";
 
 const isGitHubPages = process.env.GITHUB_PAGES === "true";
+const isCustomDomain = process.env.CUSTOM_DOMAIN === "true";
 
 export default defineConfig({
-  base: isGitHubPages ? "/Cortex-TV/" : "/",
+  base: isCustomDomain ? "/" : isGitHubPages ? "/Cortex-TV/" : "/",
   server: {
     middlewareMode: false,
     hmr: {

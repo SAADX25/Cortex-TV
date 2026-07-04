@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && tsc -p tsconfig.electron.json && vite build",
-    "build:web": "tsc -p tsconfig.json && cross-env GITHUB_PAGES=true vite build",
+    "build:web": "tsc -p tsconfig.json && cross-env CUSTOM_DOMAIN=true vite build",
+    "build:web:pages": "tsc -p tsconfig.json && cross-env GITHUB_PAGES=true vite build",
+    "build:web:custom": "tsc -p tsconfig.json && cross-env CUSTOM_DOMAIN=true vite build",
     "predeploy": "npm run build",
     "deploy": "gh-pages -d dist",
     "build:mobile": "npm run build && npx cap sync android",
