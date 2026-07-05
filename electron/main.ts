@@ -228,6 +228,7 @@ function setupWebRequestInterceptor() {
 }
 
 // â”€â”€ App lifecycle â”€â”€
+
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   setupWebRequestInterceptor();

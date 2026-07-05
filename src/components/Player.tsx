@@ -10,7 +10,8 @@ import { Capacitor } from "@capacitor/core";
 import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "../hooks/useIPTV";
 import { resolveStream } from "../utils/StreamResolver";
-import { flagUrl, cleanName, GEO_BLOCK_COUNTRIES } from "../utils/channelUtils";
+import { flagUrl, cleanName, GEO_BLOCK_COUNTRIES, getStreamHealth } from "../utils/channelUtils";
+import ChannelList from "./ChannelList";
 
 interface PlayerProps {
   channel: ChannelWithStream;
@@ -261,46 +262,27 @@ function categoriseError(details: string, country?: string): {
 } {
   const d = details.toLowerCase();
   const isGeoCountry = country ? GEO_BLOCK_COUNTRIES.has(country.toUpperCase()) : false;
+  const restricted =
+    isGeoCountry ||
+    d.includes("geo") ||
+    d.includes("region") ||
+    d.includes("restricted") ||
+    d.includes("cors") ||
+    d.includes("403") ||
+    d.includes("forbidden");
 
-  if (d.includes("manifest") || d.includes("404")) {
+  if (restricted) {
     return {
-      title: "Stream Not Found",
-      message:
-        "The stream manifest could not be loaded. The channel may have been removed or its URL changed.",
-      icon: "🔗",
+      title: "Stream restricted",
+      message: "This stream is restricted by the provider or region.",
+      icon: "lock",
     };
   }
-  if (d.includes("timeout") || d.includes("aborted")) {
-    return {
-      title: "Connection Timed Out",
-      message:
-        "The stream server did not respond in time. Check your network or try again later.",
-      icon: "⏱️",
-    };
-  }
-  if (d.includes("cors") || d.includes("403") || d.includes("forbidden")) {
-    return {
-      title: isGeoCountry ? "Stream is Geo-Blocked" : "Access Restricted",
-      message: isGeoCountry
-        ? "Stream is Geo-Blocked. A VPN connected to this country is required to watch this channel."
-        : "This stream is geo-blocked or requires special access that cannot be provided.",
-      icon: "🔒",
-    };
-  }
-  /* Default — network errors on geo-blocked countries get a VPN hint */
-  if (isGeoCountry) {
-    return {
-      title: "Stream is Geo-Blocked",
-      message:
-        "Stream is Geo-Blocked. A VPN connected to this country is required to watch this channel.",
-      icon: "🌍",
-    };
-  }
+
   return {
-    title: "Stream Offline or Geo-Blocked",
-    message:
-      "This stream could not be loaded. It may be temporarily offline, geo-restricted, or require authentication.",
-    icon: "📡",
+    title: "Stream unavailable",
+    message: "Stream unavailable. Try another channel.",
+    icon: "signal",
   };
 }
 
@@ -319,93 +301,6 @@ function SidebarFallbackIcon() {
     </svg>
   );
 }
-
-/* ── Sidebar channel row (Famelack style, memoised to skip re-renders) ── */
-const SidebarRow = memo(function SidebarRow({
-  ch,
-  isActive,
-  onPlay,
-}: {
-  ch: ChannelWithStream;
-  isActive: boolean;
-  onPlay: () => void;
-}) {
-  const displayName = cleanName(ch.name);
-  const categoryLabel = ch.categories[0]?.toUpperCase().substring(0, 8) || "";
-
-  return (
-    <div
-      role="button"
-      tabIndex={ch.streamUrl ? 0 : -1}
-      onClick={() => ch.streamUrl && onPlay()}
-      onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && ch.streamUrl) {
-          e.preventDefault();
-          onPlay();
-        }
-      }}
-      aria-disabled={!ch.streamUrl}
-      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg mx-2 my-[3px] select-none outline-none transition-colors focus-visible:ring-1 focus-visible:ring-blue-400/50 ${
-        isActive
-          ? "bg-blue-400 cursor-default"
-          : ch.streamUrl
-            ? "cursor-pointer hover:bg-gray-800/70"
-            : "opacity-40 cursor-not-allowed"
-      }`}
-    >
-      {/* Logo / Flag */}
-      <div className={`shrink-0 h-8 w-8 rounded overflow-hidden flex items-center justify-center ${
-        isActive ? "bg-blue-300/30" : "bg-white/[0.06]"
-      }`}>
-        {ch.country ? (
-          <img
-            src={flagUrl(ch.country)}
-            alt={ch.country}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            onError={(e) => {
-              const img = e.target as HTMLImageElement;
-              if (ch.logo && img.src !== ch.logo) {
-                img.src = ch.logo;
-              } else {
-                img.style.display = "none";
-              }
-            }}
-          />
-        ) : ch.logo ? (
-          <img
-            src={ch.logo}
-            alt=""
-            className="w-full h-full object-contain p-0.5"
-            loading="lazy"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-        ) : (
-          <SidebarFallbackIcon />
-        )}
-      </div>
-
-      {/* Channel name */}
-      <span className={`flex-1 text-sm font-medium truncate ${isActive ? "text-black font-semibold" : "text-white/90"}`}>
-        {displayName}
-      </span>
-
-      {/* Category tag */}
-      {categoryLabel && (
-        <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
-          isActive ? "bg-blue-500/20 text-blue-900" : "text-white/30"
-        }`}>
-          {categoryLabel}
-        </span>
-      )}
-
-      {/* Offline indicator */}
-      {!ch.streamUrl && (
-        <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-white/10" />
-      )}
-    </div>
-  );
-});
 
 export default function Player({
   channel,
@@ -431,6 +326,7 @@ export default function Player({
   const [nativeFallback, setNativeFallback] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [showDebug, setShowDebug] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
   const MAX_RETRIES = 2;
 
   /* ── Live clock for sidebar header (updates every 30 s) ── */
@@ -498,8 +394,26 @@ export default function Player({
     setStatus("loading");
     setErrorMsg("");
     setErrorTitle("");
+    setReportCopied(false);
     setNativeFallback(false);   // reset fallback on manual retry
   }, []);
+
+  const handleReportBrokenStream = useCallback(() => {
+    const report = [
+      "Cortex TV broken stream report",
+      `Channel: ${cleanName(channel.name)}`,
+      `Country: ${channel.country || "Unknown"}`,
+      `Stream: ${channel.streamUrl || "No stream URL"}`,
+      `Status: ${errorTitle || "Stream unavailable"}`,
+      `Message: ${errorMsg || "Stream unavailable. Try another channel."}`,
+    ].join("\n");
+
+    setReportCopied(true);
+    window.setTimeout(() => setReportCopied(false), 2400);
+    navigator.clipboard?.writeText(report).catch(() => {
+      console.info("[Player] Broken stream report", report);
+    });
+  }, [channel.country, channel.name, channel.streamUrl, errorMsg, errorTitle]);
 
   /* ── Orientation listener ── */
   useEffect(() => {
@@ -517,11 +431,32 @@ export default function Player({
 
   /* ── Resolve the stream URL before handing it to HLS ── */
   useEffect(() => {
-    if (!channel.streamUrl) {
+    setReportCopied(false);
+    const streamHealth = getStreamHealth(channel.streamUrl, channel.streamStatus, channel.name, channel.country);
+
+    if (streamHealth === "geo-blocked") {
       setResolvedUrl(null);
-      addDebugLine(`❌ No streamUrl for channel "${channel.name}"`);
+      setResolving(false);
+      setErrorTitle("Stream restricted");
+      setErrorMsg("This stream is restricted by the provider or region.");
+      setStatus("error");
+      addDebugLine(`Known restricted stream for "${channel.name}"`);
       return;
     }
+
+    if (streamHealth === "offline" || !channel.streamUrl) {
+      setResolvedUrl(null);
+      setResolving(false);
+      setErrorTitle("Stream unavailable");
+      setErrorMsg("Stream unavailable. Try another channel.");
+      setStatus("error");
+      addDebugLine(`No playable stream for "${channel.name}"`);
+      return;
+    }
+
+    setStatus("loading");
+    setErrorMsg("");
+    setErrorTitle("");
 
     let cancelled = false;
     setResolving(true);
@@ -557,7 +492,7 @@ export default function Player({
       });
 
     return () => { cancelled = true; };
-  }, [channel.streamUrl, retryCount]);
+  }, [addDebugLine, channel.country, channel.name, channel.streamStatus, channel.streamUrl, retryCount]);
 
   useEffect(() => {
     /* Wait until the resolver has produced a URL */
@@ -568,8 +503,8 @@ export default function Player({
 
     if (!video) {
       setStatus("error");
-      setErrorTitle("No Stream Available");
-      setErrorMsg("No stream URL is available for this channel.");
+      setErrorTitle("Stream unavailable");
+      setErrorMsg("Stream unavailable. Try another channel.");
       return;
     }
 
@@ -594,11 +529,11 @@ export default function Player({
         video.play().catch(() => setStatus("playing"));
       };
       const onNativeError = () => {
-        setErrorTitle("Playback Failed");
+        setErrorTitle("Stream unavailable");
         setErrorMsg(
           nativeFallback
-            ? "Both HLS.js and native playback failed. The stream may be offline or geo-blocked."
-            : "Native HLS playback is not supported for this stream."
+            ? "Stream unavailable. Try another channel."
+            : "Stream unavailable. Try another channel."
         );
         setStatus("error");
       };
@@ -610,9 +545,9 @@ export default function Player({
       const timeout = setTimeout(() => {
         setStatus((s) => {
           if (s === "loading") {
-            setErrorTitle("Connection Timed Out");
+            setErrorTitle("Stream unavailable");
             setErrorMsg(
-              "The stream server did not respond. It may be offline or geo-blocked."
+              "Stream unavailable. Try another channel."
             );
             return "error";
           }
@@ -786,8 +721,8 @@ export default function Player({
                 setStatus((s) => {
                   if (s !== "playing") {
                     fallbackOrError(
-                      "Media Decode Error",
-                      "The stream format is incompatible or corrupted. Try a different channel."
+                      "Stream unavailable",
+                      "Stream unavailable. Try another channel."
                     );
                   }
                   return s;
@@ -807,9 +742,9 @@ export default function Player({
     const timeout = setTimeout(() => {
       setStatus((s) => {
         if (s === "loading") {
-          setErrorTitle("Connection Timed Out");
+          setErrorTitle("Stream unavailable");
           setErrorMsg(
-            "The stream server did not respond. It may be offline or geo-blocked."
+            "Stream unavailable. Try another channel."
           );
           return "error";
         }
@@ -903,12 +838,12 @@ export default function Player({
                 <BrokenTvIcon className="text-red-400/70 !w-8 !h-8" />
               </div>
               <p className="text-xs font-semibold text-white/70 text-center">
-                {errorTitle || "Stream Unavailable"}
+                {errorTitle || "Stream unavailable"}
               </p>
               <p className="text-[10px] text-white/30 text-center mt-1 leading-snug max-w-[260px]">
-                {errorMsg || "Could not load this stream."}
+                {errorMsg || "Stream unavailable. Try another channel."}
               </p>
-              <div className="flex gap-2 mt-3">
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
                 {retryCount < MAX_RETRIES && (
                   <button
                     onClick={handleRetry}
@@ -922,12 +857,19 @@ export default function Player({
                   </button>
                 )}
                 <button
+                  onClick={handleReportBrokenStream}
+                  className="px-3 py-1.5 rounded-lg border border-amber-300/20 bg-amber-300/10 text-amber-100/80 text-[11px] font-medium active:scale-95 transition-transform"
+                >
+                  Report broken stream
+                </button>
+                <button
                   onClick={onClose}
                   className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-white/50 text-[11px] font-medium active:scale-95 transition-transform"
                 >
                   Close
                 </button>
               </div>
+              {reportCopied && <p className="mt-2 text-[10px] font-semibold text-amber-100/70">Report details copied.</p>}
             </div>
           )}
 
@@ -1022,7 +964,10 @@ export default function Player({
 
       {/* ══════════ DESKTOP: Famelack-style side-by-side overlay ══════════ */}
       {!isMobile && (
-      <div className="fixed inset-0 z-40 flex flex-row items-center justify-between p-6 gap-5 bg-black">
+      <div 
+        className="fixed inset-0 z-40 flex flex-row items-center justify-between p-6 bg-black"
+        style={{ paddingRight: sidebarChannels && sidebarChannels.length > 0 ? "max(1.5rem, calc(430px + 1.5rem))" : undefined }}
+      >
 
         {/* ── VIDEO AREA (left / centre — flexible width) ── */}
         <div
@@ -1109,28 +1054,32 @@ export default function Player({
                   </div>
                 </div>
                 <h2 className="text-xl font-bold text-white/80 tracking-wide">
-                  {errorTitle || "Stream Offline or Geo-Blocked"}
+                  {errorTitle || "Stream unavailable"}
                 </h2>
                 <div className="w-16 h-px bg-gradient-to-r from-transparent via-red-400/30 to-transparent mt-3 mb-4" />
                 <p className="text-sm text-white/35 leading-relaxed">
-                  {errorMsg || "This stream could not be loaded."}
+                  {errorMsg || "Stream unavailable. Try another channel."}
                 </p>
                 <div className="mt-5 flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/5 px-4 py-2">
                   {channel.logo && <img src={channel.logo} alt="" className="h-5 w-5 rounded object-contain" />}
                   <span className="text-xs text-white/40 truncate max-w-[200px]">{channel.name}</span>
                   {channel.country && <span className="text-[10px] text-white/20 uppercase">{channel.country}</span>}
                 </div>
-                <div className="flex items-center gap-3 mt-7">
+                <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
                   {retryCount < MAX_RETRIES && (
                     <button onClick={handleRetry} className="px-5 py-2.5 rounded-xl border border-cyan-500/25 bg-cyan-500/10 text-cyan-400 text-sm font-medium hover:bg-cyan-500/20 transition-all cursor-pointer flex items-center gap-2">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
                       Retry Stream
                     </button>
                   )}
+                  <button onClick={handleReportBrokenStream} className="px-5 py-2.5 rounded-xl border border-amber-300/20 bg-amber-300/10 text-amber-100/80 text-sm font-medium hover:bg-amber-300/15 transition-all cursor-pointer">
+                    Report broken stream
+                  </button>
                   <button onClick={onClose} className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/5 text-white/60 text-sm font-medium hover:bg-white/10 transition-all cursor-pointer">
-                    ← Back to channels
+                    Back to channels
                   </button>
                 </div>
+                {reportCopied && <p className="mt-3 text-[10px] font-semibold text-amber-100/70">Report details copied.</p>}
                 {retryCount >= MAX_RETRIES && (
                   <p className="mt-4 text-[10px] text-white/15">Max retries reached. Try a different channel.</p>
                 )}
@@ -1167,192 +1116,21 @@ export default function Player({
           )}
         </div>
 
-        {/* ── SIDEBAR (right — ~30% width) ── */}
-        <div
-          className="w-[30%] min-w-[260px] max-w-[400px] bg-[#1a1a1a]/[0.97] rounded-xl flex flex-col overflow-hidden self-center border border-white/[0.06] shadow-2xl"
-          style={{ height: "85vh" }}
-        >
-          {/* Sidebar header */}
-          <div className="shrink-0 flex items-center gap-3 px-4 py-4 border-b border-white/[0.06]">
-            {/* Green back button */}
-            <button
-              onClick={onBack ?? onClose}
-              className="shrink-0 h-9 w-9 rounded-full bg-emerald-500 hover:bg-emerald-400 flex items-center justify-center text-white transition-colors cursor-pointer active:scale-90 shadow-[0_0_10px_rgba(16,185,129,0.35)]"
-              title="Back"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m15 18-6-6 6-6" />
-              </svg>
-            </button>
-
-            {/* Country / playlist name */}
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-bold text-[15px] truncate leading-tight">
-                {sidebarCountryName ?? channel.country ?? "Channels"}
-              </p>
-              {channel.country && sidebarCountryName && sidebarCountryName !== channel.country && (
-                <p className="text-white/40 text-xs truncate">{channel.country}</p>
-              )}
-            </div>
-
-            {/* Live clock */}
-            <span className="shrink-0 text-white/50 text-sm font-mono tabular-nums">
-              {currentTime}
-            </span>
-          </div>
-
-          {/* ── Sidebar search bar ── */}
-          {sidebarChannels && sidebarChannels.length > 0 && !sidebarLoading && (
-            <div className="shrink-0 px-3 py-2.5 border-b border-white/[0.07]">
-              <div className={`relative flex items-center rounded-lg overflow-hidden transition-all duration-200 ${
-                sidebarSearch
-                  ? "ring-1 ring-blue-500/50 bg-[#1c2a3a]"
-                  : "bg-[#252525] hover:bg-[#2a2a2a] focus-within:ring-1 focus-within:ring-blue-500/40 focus-within:bg-[#1c2a3a]"
-              }`}>
-                {/* Search icon */}
-                <div className="absolute left-0 top-0 bottom-0 w-11 flex items-center justify-center pointer-events-none shrink-0">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className={`transition-colors duration-200 ${sidebarSearch ? "text-blue-400" : "text-white/30"}`}
-                  >
-                    <circle cx="11" cy="11" r="8" />
-                    <path d="m21 21-4.3-4.3" />
-                  </svg>
-                </div>
-
-                <input
-                  type="text"
-                  inputMode="search"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  value={sidebarSearch}
-                  onChange={(e) => setSidebarSearch(e.target.value)}
-                  placeholder="Search channels…"
-                  className="w-full bg-transparent pl-11 pr-10 py-3 text-[13.5px] text-white/90 placeholder-white/20 outline-none caret-blue-400 font-medium"
-                />
-
-                {/* Right side: result count pill OR clear button */}
-                <div className="absolute right-0 top-0 bottom-0 flex items-center pr-3">
-                  {sidebarSearch ? (
-                    <button
-                      onClick={() => setSidebarSearch("")}
-                      className="flex items-center justify-center h-6 w-6 rounded-full bg-white/[0.10] hover:bg-red-500/80 text-white/40 hover:text-white transition-all duration-150 active:scale-90 cursor-pointer"
-                      aria-label="Clear search"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  ) : (
-                    <kbd className="hidden text-[9px] text-white/15 font-mono border border-white/10 rounded px-1 py-0.5 sm:inline">
-                      /
-                    </kbd>
-                  )}
-                </div>
-              </div>
-
-              {/* Result count — inline below, only while filtering */}
-              {sidebarSearch && (
-                <div className="flex items-center justify-between mt-1.5 px-1">
-                  <span className="text-[10.5px] text-white/30 font-medium">
-                    {filteredSidebarChannels.length === 0
-                      ? "No matches"
-                      : `${filteredSidebarChannels.length} channel${filteredSidebarChannels.length !== 1 ? "s" : ""} found`
-                    }
-                  </span>
-                  {/* Stale indicator — shows briefly while deferred search catches up */}
-                  {sidebarSearch !== deferredSearch && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse" />
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Sidebar body: channel list ── */}
-          {sidebarLoading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-7 w-7 rounded-full border-2 border-blue-400/30 border-t-blue-400 animate-spin" />
-                <span className="text-xs text-white/30">Loading channels…</span>
-              </div>
-            </div>
-          ) : sidebarError ? (
-            <div className="flex-1 flex items-center justify-center px-5">
-              <p className="text-sm text-red-400/70 text-center">{sidebarError}</p>
-            </div>
-          ) : sidebarChannels && sidebarChannels.length > 0 ? (
-            filteredSidebarChannels.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-6 mt-4">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-                  className="text-white/20"
-                >
-                  <circle cx="11" cy="11" r="8" />
-                  <path d="m21 21-4.3-4.3" />
-                </svg>
-                <p className="text-sm text-gray-400">No channels match</p>
-                <button
-                  onClick={() => setSidebarSearch("")}
-                  className="text-[12px] text-blue-400/70 hover:text-blue-400 underline underline-offset-2 transition-colors cursor-pointer"
-                >
-                  Clear search
-                </button>
-              </div>
-            ) : (
-            <div className="flex-1 overflow-hidden">
-              <Virtuoso
-                style={{ height: "100%" }}
-                totalCount={filteredSidebarChannels.length}
-                itemContent={(index) => {
-                  const ch = filteredSidebarChannels[index];
-                  if (!ch) return null;
-                  return (
-                    <SidebarRow
-                      ch={ch}
-                      isActive={ch.id === channel.id}
-                      onPlay={() => onPlayChannel?.(ch)}
-                    />
-                  );
-                }}
-                overscan={{ main: 200, reverse: 100 }}
-                className="scrollbar-thin"
-              />
-            </div>
-            )
-          ) : (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-5">
-              <div className="text-3xl opacity-40">📡</div>
-              <p className="text-sm text-white/30">No channels available.</p>
-            </div>
-          )}
-
-          {/* Sidebar footer: channel count */}
-          {sidebarChannels && !sidebarLoading && (
-            <div className="shrink-0 px-4 py-2.5 border-t border-white/[0.05] flex items-center justify-between">
-              <span className="text-[11px] text-white/25 font-medium">
-                {sidebarSearch
-                  ? `${filteredSidebarChannels.length} of ${sidebarChannels.length}`
-                  : `${sidebarChannels.length} channel${sidebarChannels.length !== 1 ? "s" : ""}`
-                }
-              </span>
-              <span className="text-[11px] text-emerald-400/40 font-medium">
-                {sidebarChannels.filter((c) => c.streamUrl).length} live
-              </span>
-            </div>
-          )}
-        </div>
+        {/* ── SIDEBAR (right) using ChannelList ── */}
+        {sidebarChannels && sidebarChannels.length > 0 && (
+          <ChannelList
+            countryName={sidebarCountryName ?? channel.country ?? "Channels"}
+            channels={sidebarChannels}
+            loading={sidebarLoading ?? false}
+            error={sidebarError ?? null}
+            onPlayChannel={onPlayChannel}
+            onClose={onClose}
+            favorites={favorites ?? []}
+            onToggleFavorite={onToggleFavorite ?? (() => {})}
+            isPlaying={true}
+            playingChannelId={channel.id}
+          />
+        )}
 
       </div>
       )}

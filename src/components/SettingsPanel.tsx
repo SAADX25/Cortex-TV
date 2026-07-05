@@ -512,34 +512,45 @@ export default function SettingsPanel({
             </div>
           </section>
 
-          {/* ══ Legal & Disclaimer Card ══ */}
+          {/* Legal Card */}
           <section>
             <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3 ml-2">
-              Legal &amp; Disclaimer
+              Legal
             </h3>
             <div className="bg-[#112240] rounded-2xl p-4 space-y-3 text-xs text-white/40 leading-relaxed">
               <p>
-                Cortex TV is a <span className="text-white/60 font-medium">free, open-source</span> channel browser.
-                It does <strong className="text-white/60">not</strong> host, store, or redistribute any media content.
+                Cortex TV does not host video content. It indexes and plays public external streams.
               </p>
               <p>
-                All channel metadata is sourced from the{" "}
-                <span className="text-cyan-400/60">iptv-org/iptv</span> public database.
-                Stream URLs are publicly available and community-maintained.
+                Channel metadata and public stream references are attributed to{" "}
+                <a href="https://github.com/iptv-org/iptv" target="_blank" rel="noreferrer" className="text-cyan-300/70 hover:text-cyan-200">iptv-org</a>{" "}
+                where used. Stream availability is controlled by the original providers.
               </p>
               <p>
-                Some streams may be geo-restricted in your country. Use of this
-                app is at your own discretion and subject to the laws of your
-                region. Only free, publicly accessible channels are shown.
+                Some streams may be unavailable, provider-restricted, or region-restricted. Use Cortex TV at your own discretion and in accordance with local laws.
               </p>
               <p>
-                This project is not affiliated with any broadcaster or
-                streaming platform.
+                Cortex TV is not affiliated with any broadcaster, streaming platform, or channel owner.
               </p>
             </div>
           </section>
 
-          {/* ══ Technical Info Card ══ */}
+          {/* Privacy Card */}
+          <section>
+            <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3 ml-2">
+              Privacy
+            </h3>
+            <div className="bg-[#112240] rounded-2xl p-4 space-y-3 text-xs text-white/40 leading-relaxed">
+              <p>
+                Cortex TV stores preferences such as favorites, recent channels, and custom playlist settings locally on this device.
+              </p>
+              <p>
+                The app does not require an account to browse public streams. External stream providers and source APIs may receive standard network requests when content is loaded.
+              </p>
+            </div>
+          </section>
+
+          {/* About Card */}
           <section>
             <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3 ml-2">
               About

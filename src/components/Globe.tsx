@@ -314,6 +314,8 @@ const GLOBE_NIGHT_URL =
   "https://unpkg.com/three-globe/example/img/earth-night.jpg";
 const BUMP_IMAGE_URL =
   "https://unpkg.com/three-globe/example/img/earth-topology.png";
+const GLOBE_BACKGROUND_URL =
+  "https://unpkg.com/three-globe/example/img/night-sky.png";
 const NIGHT_SKY_URL =
   "https://unpkg.com/three-globe/example/img/night-sky.png";
 const GEOJSON_URL =
@@ -935,7 +937,7 @@ function GlobeInner({
         bumpImageUrl={undefined}
         /* ── Scene ── */
         backgroundColor="rgba(0,0,0,0)"
-        backgroundImageUrl={undefined}
+        backgroundImageUrl={GLOBE_BACKGROUND_URL}
         enablePointerInteraction={!paused}
         showAtmosphere={false}
         atmosphereColor={isNightMode ? "#0066cc" : "#00bfff"}

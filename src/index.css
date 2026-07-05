@@ -101,93 +101,44 @@ body {
 
 /* ── Sidebar slide-in animation ── */
 @keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
 }
-
 .animate-slide-in {
   animation: slide-in-right 0.3s ease-out;
 }
 
 /* ── Search modal animations ── */
 @keyframes modal-in {
-  from {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+  from { opacity: 0; transform: translateY(-20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0)     scale(1);    }
 }
 @keyframes modal-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-20px) scale(0.96);
-  }
+  from { opacity: 1; transform: translateY(0)     scale(1);    }
+  to   { opacity: 0; transform: translateY(-20px) scale(0.96); }
 }
-.animate-modal-in {
-  animation: modal-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.animate-modal-out {
-  animation: modal-out 0.2s ease-in forwards;
-}
+.animate-modal-in  { animation: modal-in  0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-modal-out { animation: modal-out 0.2s ease-in forwards; }
 
 /* ── Backdrop fade ── */
-@keyframes backdrop-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-@keyframes backdrop-out {
-  from { opacity: 1; }
-  to   { opacity: 0; }
-}
-.animate-backdrop-in {
-  animation: backdrop-in 0.2s ease-out;
-}
-.animate-backdrop-out {
-  animation: backdrop-out 0.25s ease-in forwards;
-}
+@keyframes backdrop-in  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes backdrop-out { from { opacity: 1; } to { opacity: 0; } }
+.animate-backdrop-in  { animation: backdrop-in  0.2s ease-out; }
+.animate-backdrop-out { animation: backdrop-out 0.25s ease-in forwards; }
 
 /* ── Settings panel slide-in from left ── */
 @keyframes settings-in {
-  from {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
 }
 @keyframes settings-out {
-  from {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  to {
-    transform: translateX(-100%);
-    opacity: 0;
-  }
+  from { transform: translateX(0);     opacity: 1; }
+  to   { transform: translateX(-100%); opacity: 0; }
 }
-.animate-settings-in {
-  animation: settings-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.animate-settings-out {
-  animation: settings-out 0.28s ease-in forwards;
-}
+.animate-settings-in  { animation: settings-in  0.3s  cubic-bezier(0.16, 1, 0.3, 1); }
+.animate-settings-out { animation: settings-out 0.28s ease-in forwards; }
 
-/* ── Settings slider (range input) – larger thumb for touch ── */
+/* ── Settings slider (range input) ── */
 .settings-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -226,19 +177,65 @@ body {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* ── Thin scrollbar for channel list ── */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 4px;
+/* ─────────────────────────────────────────────────────────────────────
+   Cortex HUD panel: shared glassmorphism for left sidebar + right panel
+───────────────────────────────────────────────────────────────────── */
+.cortex-hud-panel {
+  background: rgba(7, 14, 30, 0.82);
+  border: 1px solid rgba(34, 211, 238, 0.10);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow:
+    0 0 0 0.5px rgba(34, 211, 238, 0.06) inset,
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 24px 80px rgba(0, 0, 0, 0.52),
+    0 4px 16px rgba(0, 0, 0, 0.32);
 }
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: transparent;
+
+/* Left sidebar flush — no left/top/bottom border on screen edge */
+.cortex-hud-panel.rounded-r-2xl {
+  border-left: none;
+  border-top: none;
+  border-bottom: none;
 }
+
+/* Right panel flush — no right/top/bottom border on screen edge */
+.cortex-hud-panel.rounded-l-2xl {
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+}
+
+/* ── Thin scrollbar (cyan, used in channel list / categories) ── */
+.scrollbar-thin::-webkit-scrollbar       { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
+  background: rgba(34, 211, 238, 0.12);
+  border-radius: 4px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(34, 211, 238, 0.26);
+}
+
+/* ── Country scroll area: dedicated 3px cyan scrollbar ── */
+.country-scroll-area::-webkit-scrollbar       { width: 3px; }
+.country-scroll-area::-webkit-scrollbar-track { background: transparent; }
+.country-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(34, 211, 238, 0.15);
+  border-radius: 4px;
+}
+.country-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.32);
+}
+/* Firefox */
+.country-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(34, 211, 238, 0.15) transparent;
+}
+
+/* Country row hover — subtle left cyan accent line */
+.country-row:hover {
+  box-shadow: inset 2px 0 0 rgba(34, 211, 238, 0.28);
 }
 
 /* ── Mobile overscroll prevention ── */
@@ -248,16 +245,18 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* ── Starfield background ── */
 .cortex-starfield {
+  display: none;
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(circle at 17px 31px, rgba(255,255,255,0.86) 0 1px, transparent 1.6px),
-    radial-gradient(circle at 89px 119px, rgba(180,230,255,0.7) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 17px 31px,  rgba(255,255,255,0.86) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 89px 119px, rgba(180,230,255,0.7)  0 1px, transparent 1.8px),
     radial-gradient(circle at 191px 73px, rgba(255,255,255,0.52) 0 1px, transparent 1.5px),
-    radial-gradient(circle at 311px 181px, rgba(134,211,255,0.42) 0 1px, transparent 1.7px),
+    radial-gradient(circle at 311px 181px,rgba(134,211,255,0.42) 0 1px, transparent 1.7px),
     radial-gradient(circle at 421px 47px, rgba(255,255,255,0.34) 0 1px, transparent 1.4px),
     radial-gradient(circle at 49px 271px, rgba(255,255,255,0.28) 0 1px, transparent 1.6px);
   background-size: 233px 233px, 317px 317px, 389px 389px, 503px 503px, 619px 619px, 719px 719px;
@@ -273,6 +272,6 @@ body {
     radial-gradient(circle at 33% 24%, rgba(255,255,255,0.95) 0 1.4px, transparent 2.4px),
     radial-gradient(circle at 71% 32%, rgba(170,226,255,0.74) 0 1.2px, transparent 2.2px),
     radial-gradient(circle at 58% 74%, rgba(255,255,255,0.62) 0 1.2px, transparent 2.1px),
-    radial-gradient(circle at 24% 68%, rgba(190,232,255,0.52) 0 1px, transparent 2px);
+    radial-gradient(circle at 24% 68%, rgba(190,232,255,0.52) 0 1px,   transparent 2px);
   opacity: 0.55;
 }

@@ -538,7 +538,8 @@ export default function SearchModal({
                     className={`flex h-9 min-w-0 items-center justify-center gap-2 rounded-[14px] border px-2 text-xs transition-all md:h-10 md:rounded-xl md:text-sm ${active ? "border-cyan-200/70 bg-cyan-300 text-slate-950" : "border-white/[0.08] bg-white/[0.055] text-white/72 hover:border-cyan-300/28 hover:bg-cyan-300/[0.08] hover:text-white"}`}
                   >
                     <span className={`shrink-0 ${active ? "text-slate-950" : "text-cyan-100/82"}`}>{CATEGORY_ICONS[category.value] ?? <SparkIcon />}</span>
-                    <span className="truncate font-semibold">{category.label}</span>
+                    <span className="min-w-0 flex-1 truncate font-semibold">{category.label}</span>
+                    <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${active ? "bg-slate-950/10 text-slate-950/70" : "bg-white/[0.07] text-white/42"}`}>{category.count}</span>
                   </button>
                 );
               })}

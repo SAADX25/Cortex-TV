@@ -177,12 +177,15 @@ export function isUsableStream(
 
 export const CATEGORY_DEFS = [
   { key: "all", label: "All", aliases: [] },
+  { key: "news", label: "News", aliases: ["news"] },
   { key: "sports", label: "Sports", aliases: ["sport", "sports"] },
   { key: "movies", label: "Movies", aliases: ["movie", "movies", "cinema", "film"] },
-  { key: "music", label: "Music", aliases: ["music", "radio"] },
-  { key: "news", label: "News", aliases: ["news"] },
+  { key: "music", label: "Music", aliases: ["music", "radio", "concert"] },
   { key: "entertainment", label: "Entertainment", aliases: ["entertainment", "general"] },
   { key: "kids", label: "Kids", aliases: ["kids", "children", "family"] },
+  { key: "documentary", label: "Documentary", aliases: ["documentary", "docs", "science", "history", "nature"] },
+  { key: "religious", label: "Religious", aliases: ["religious", "religion", "faith", "islam", "christian", "church"] },
+  { key: "business", label: "Business", aliases: ["business", "finance", "financial", "markets", "economy"] },
 ] as const;
 
 export function categoryDisplayName(value: string): string {

@@ -80,7 +80,6 @@ function CloseIcon() {
   );
 }
 
-
 function Logo({ channel, active }: { channel: ChannelWithStream; active: boolean }) {
   return (
     <div className={`flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border ${active ? "border-blue-200/35 bg-blue-200/20" : "border-white/[0.07] bg-white/[0.05]"}`}>
@@ -159,13 +158,23 @@ const ChannelRow = memo(function ChannelRow({
             {isActive && <span className="text-[10px] font-bold uppercase tracking-wide text-blue-950/65">Selected</span>}
           </div>
         </div>
+
+        {/* ── Favorite star button — always visible ── */}
         <button
           type="button"
           onClick={(event) => {
             event.stopPropagation();
             onToggleFavorite();
           }}
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 ${isFavorite ? "bg-amber-300/18 text-amber-200" : isActive ? "bg-blue-900/10 text-blue-950/55" : "bg-white/[0.05] text-white/36 hover:text-amber-200"}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-all active:scale-95 ${
+            isFavorite
+              ? isActive
+                ? "bg-amber-100 text-amber-600 shadow-sm"
+                : "bg-amber-300/18 text-amber-200"
+              : isActive
+                ? "bg-blue-900/15 text-blue-900 hover:bg-amber-100 hover:text-amber-600"
+                : "bg-white/[0.05] text-white/40 hover:bg-amber-300/15 hover:text-amber-200"
+          }`}
           aria-label={isFavorite ? `Remove ${channel.name} from favorites` : `Add ${channel.name} to favorites`}
           title={isFavorite ? "Remove from favorites" : "Add to favorites"}
         >
@@ -182,10 +191,12 @@ function SelectFilter({ label, value, options, onChange }: { label: string; valu
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35">{label}</span>
-      <select value={value ?? ""} onChange={(event) => onChange(event.target.value || null)} className="h-9 rounded-lg border border-white/[0.08] bg-[#13213a] px-2 text-xs text-white/82 outline-none focus:border-cyan-300/40">
-        <option value="">All</option>
+      <select value={value ?? ""} onChange={(event) => onChange(event.target.value || null)} className="h-9 rounded-lg border border-white/[0.08] bg-white/[0.04] px-2 text-xs text-white/82 outline-none transition-all hover:bg-white/[0.06] focus:border-cyan-300/40 focus:bg-cyan-300/[0.04] focus:shadow-[0_0_12px_rgba(34,211,238,0.05)]">
+        <option value="" className="bg-[#1a1a1a] text-white">All</option>
         {options.map((option) => (
-          <option key={option.value} value={option.value}>{option.label} ({option.count})</option>
+          <option key={option.value} value={option.value} className="bg-[#1a1a1a] text-white">
+            {option.label} ({option.count})
+          </option>
         ))}
       </select>
     </label>
@@ -314,7 +325,7 @@ export default function ChannelList({
   );
 
   return (
-    <div className={`fixed top-0 mobile-safe-panel-top right-0 bottom-0 z-[60] flex w-full flex-col border-l border-cyan-500/15 bg-black/95 mobile-safe-panel-bottom backdrop-blur-xl md:absolute md:top-0 md:z-30 md:w-[430px] md:bg-black/82 md:pb-0 ${isPlaying ? "pt-[calc(100vw*9/16+2.5rem)] md:pt-0" : ""}`}>
+    <div className={`cortex-hud-panel fixed top-0 mobile-safe-panel-top right-0 bottom-0 z-[60] flex w-full flex-col mobile-safe-panel-bottom md:absolute md:top-0 md:z-30 md:w-[430px] md:rounded-l-2xl md:pb-0 ${isPlaying ? "pt-[calc(100vw*9/16+2.5rem)] md:pt-0" : ""}`}>
       <div className="shrink-0 border-b border-white/[0.05] bg-gradient-to-b from-white/[0.045] to-transparent px-5 pb-4 pt-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
@@ -329,8 +340,8 @@ export default function ChannelList({
           )}
         </div>
 
-        <div className="mt-4 flex h-11 items-center gap-3 rounded-xl border border-white/10 bg-[#13213a] px-4 focus-within:border-cyan-300/35">
-          <span className={search ? "text-cyan-200" : "text-white/30"}><SearchIcon /></span>
+        <div className="mt-4 flex h-10 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 transition-all duration-200 focus-within:border-cyan-300/38 focus-within:bg-cyan-300/[0.04] focus-within:shadow-[0_0_18px_rgba(34,211,238,0.07)]">
+          <span className={`shrink-0 transition-colors ${search ? "text-cyan-300/70" : "text-white/28"}`}><SearchIcon /></span>
           <input
             ref={inputRef}
             type="text"
@@ -352,7 +363,22 @@ export default function ChannelList({
 
 
         <div className="mt-3 hidden md:block">{filterPanel}</div>
-        {showMobileFilters && <div className="mt-3 md:hidden">{filterPanel}</div>}
+        {showMobileFilters && (
+          <div className="fixed inset-0 z-[85] bg-black/55 backdrop-blur-[2px] md:hidden" onClick={() => setShowMobileFilters(false)}>
+            <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-cyan-200/14 bg-[#07101f] p-4 shadow-[0_-24px_80px_rgba(0,0,0,0.55)]" onClick={(event) => event.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.22em] text-cyan-200/62">Browse Filters</p>
+                  <h3 className="mt-1 text-lg font-bold text-white">Country, category, and stream status</h3>
+                </div>
+                <button type="button" onClick={() => setShowMobileFilters(false)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.05] text-white/62" aria-label="Close filters">
+                  <CloseIcon />
+                </button>
+              </div>
+              {filterPanel}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-hidden">
