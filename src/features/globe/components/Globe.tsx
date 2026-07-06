@@ -357,6 +357,8 @@ interface GlobeProps {
   globeFps?: GlobeFps;
   /** Pause auto-rotation and heavy renders (search open, video playing) */
   paused?: boolean;
+  /** Enable/disable auto-rotation */
+  autoRotate?: boolean;
 }
 
 function GlobeInner({
@@ -367,6 +369,7 @@ function GlobeInner({
   globeFps = "auto",
   focusCountryIso,
   paused = false,
+  autoRotate = false,
 }: GlobeProps) {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -490,14 +493,12 @@ function GlobeInner({
     };
   }, []);
 
-  /* â”€â”€ Update rotation speed + pause state dynamically â”€â”€ */
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
     const controls = globe.controls();
-    controls.autoRotate = !paused;
-    controls.autoRotateSpeed = paused ? 0 : rotationSpeed;
-  }, [rotationSpeed, paused]);
+    controls.autoRotateSpeed = (paused || !autoRotate) ? 0 : rotationSpeed;
+  }, [rotationSpeed, autoRotate, paused]);
 
   /* â”€â”€ Freeze / resume the Three.js render loop (battery saver) â”€â”€
      When paused, setAnimationLoop(null) cancels the internal rAF.
@@ -841,7 +842,7 @@ function GlobeInner({
   /* â”€â”€ Direct mouse click on polygon (PC/Desktop) â”€â”€ */
   const handlePolygonClick = useCallback(
     (polygon: any, _event: MouseEvent, _coords: { lat: number; lng: number; altitude: number }) => {
-      if (paused || globeFps === "auto") return; // Reduce interaction overhead in auto mode
+      if (paused) return; // Allow interaction even in auto mode
       if (polygon) selectFeature(polygon);
     },
     [paused, selectFeature]

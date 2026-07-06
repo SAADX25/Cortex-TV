@@ -14,6 +14,7 @@ interface SceneProps {
   focusCountryIso?: string | null;
   globeFps?: GlobeFps;
   paused?: boolean;
+  autoRotate?: boolean;
 }
 
 export default function Scene({
@@ -24,6 +25,7 @@ export default function Scene({
   focusCountryIso,
   globeFps,
   paused,
+  autoRotate,
 }: SceneProps) {
   const handleGlobeClick = useCallback(
     (info: GlobeClickInfo) => {
@@ -47,6 +49,7 @@ export default function Scene({
       focusCountryIso={focusCountryIso}
       globeFps={globeFps}
       paused={paused}
+      autoRotate={autoRotate}
     />
   );
 }

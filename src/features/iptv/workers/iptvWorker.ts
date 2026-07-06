@@ -18,6 +18,56 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from "../types";
+import { fingerprint, idbGet, idbSet } from "./idbCache";
+import type { IPTVDataStatus } from "../types";
+
+const CHANNELS_URL = "https://iptv-org.github.io/api/channels.json";
+const STREAMS_URL = "https://iptv-org.github.io/api/streams.json";
+
+let activeChHash = "";
+let activeStHash = "";
+const CACHE_REVALIDATE_DELAY_MS = 5 * 60 * 1000;
+let revalidateTimer: ReturnType<typeof setTimeout> | null = null;
+
+function emitStatus(patch: Partial<IPTVDataStatus>) {
+  self.postMessage({ type: "STATUS_UPDATE", statusPatch: patch });
+}
+
+function scheduleRevalidateInBackground(): void {
+  if (revalidateTimer) return;
+  revalidateTimer = setTimeout(() => {
+    revalidateTimer = null;
+    revalidateInBackground();
+  }, CACHE_REVALIDATE_DELAY_MS);
+}
+
+async function revalidateInBackground(): Promise<void> {
+  emitStatus({ phase: "updating", message: "Using cached data while checking for updates", source: "cache", error: null });
+  try {
+    const [chRes, stRes] = await Promise.all([fetch(CHANNELS_URL), fetch(STREAMS_URL)]);
+    if (!chRes.ok || !stRes.ok) {
+      emitStatus({ phase: "cached", message: "Using cached channel data", source: "cache", error: null });
+      return;
+    }
+    const rawChannels: any[] = await chRes.json();
+    const rawStreams: any[] = await stRes.json();
+    const chHash = fingerprint(rawChannels);
+    const stHash = fingerprint(rawStreams);
+    if (chHash === activeChHash && stHash === activeStHash) {
+      emitStatus({ phase: "ready", message: "Channel data is up to date", source: "cache", updatedAt: Date.now(), error: null });
+      return;
+    }
+    handleInitSync(rawChannels, rawStreams);
+    activeChHash = chHash;
+    activeStHash = stHash;
+    idbSet("channels", rawChannels, chHash).catch(() => {});
+    idbSet("streams", rawStreams, stHash).catch(() => {});
+    emitStatus({ phase: "ready", message: "Channel data updated", source: "network", channelCount: allChannels.length, streamCount: indexedStreamCount, updatedAt: Date.now(), error: null });
+  } catch (err: any) {
+    emitStatus({ phase: "cached", message: "Using cached data; update check failed", source: "cache", error: err?.message ?? null });
+  }
+}
+
 
 let allChannels: ChannelWithStream[] = [];
 let streamUrlMap: Map<string, string> = new Map();
@@ -241,7 +291,7 @@ function rebuildIndexes(): void {
   };
 }
 
-function handleInit(rawChannels: any[], rawStreams: any[]): WorkerResponse {
+function handleInitSync(rawChannels: any[], rawStreams: any[]) {
   const t0 = performance.now();
   streamUrlMap = new Map();
   streamStatusMap = new Map();
@@ -267,14 +317,41 @@ function handleInit(rawChannels: any[], rawStreams: any[]): WorkerResponse {
   console.log(
     `[Worker] Indexed ${allChannels.length} channels, ${indexedStreamCount} streams, ${countryIndex.size} countries in ${elapsed}ms`,
   );
-
-  return {
-    type: "INIT_COMPLETE",
-    channelCount: allChannels.length,
-    streamCount: indexedStreamCount,
-  };
 }
 
+async function doInit() {
+  const [cachedCh, cachedSt] = await Promise.all([idbGet("channels"), idbGet("streams")]);
+  if (cachedCh && cachedSt && cachedCh.data.length > 0) {
+    console.log(`[Worker] Cache hit - ${cachedCh.data.length} channels, ${cachedSt.data.length} streams`);
+    handleInitSync(cachedCh.data, cachedSt.data);
+    activeChHash = cachedCh.hash;
+    activeStHash = cachedSt.hash;
+    emitStatus({ phase: "cached", message: "Using cached channel data", source: "cache", channelCount: allChannels.length, streamCount: indexedStreamCount, updatedAt: cachedCh.ts, error: null });
+    self.postMessage({ type: "INIT_COMPLETE", channelCount: allChannels.length, streamCount: indexedStreamCount });
+    scheduleRevalidateInBackground();
+    return;
+  }
+  
+  console.log("[Worker] No cache - fetching from iptv-org API...");
+  const [chRes, stRes] = await Promise.all([fetch(CHANNELS_URL), fetch(STREAMS_URL)]);
+  if (!chRes.ok) throw new Error(`Channels API: HTTP ${chRes.status}`);
+  if (!stRes.ok) throw new Error(`Streams API: HTTP ${stRes.status}`);
+
+  const rawChannels: any[] = await chRes.json();
+  const rawStreams: any[] = await stRes.json();
+  
+  handleInitSync(rawChannels, rawStreams);
+  const chHash = fingerprint(rawChannels);
+  const stHash = fingerprint(rawStreams);
+  activeChHash = chHash;
+  activeStHash = stHash;
+
+  idbSet("channels", rawChannels, chHash).catch(() => {});
+  idbSet("streams", rawStreams, stHash).catch(() => {});
+
+  emitStatus({ phase: "ready", message: "Channel database loaded", source: "network", channelCount: allChannels.length, streamCount: indexedStreamCount, updatedAt: Date.now(), error: null });
+  self.postMessage({ type: "INIT_COMPLETE", channelCount: allChannels.length, streamCount: indexedStreamCount });
+}
 function handleFilterByCountry(id: number, countryCodes: string[]): WorkerResponse {
   const results: ChannelWithStream[] = [];
   for (const code of countryCodes) {
@@ -513,25 +590,20 @@ function handleHomeData(id: number, favoriteIds: string[], recentIds: string[]):
 
 self.onmessage = (e: MessageEvent<WorkerRequest>) => {
   const msg = e.data;
-  let response: WorkerResponse;
+  let response: WorkerResponse | null = null;
 
   try {
     switch (msg.type) {
       case "INIT":
-        response = handleInit(msg.rawChannels, msg.rawStreams);
-        break;
+        doInit().catch(err => {
+          self.postMessage({ type: "ERROR", message: err.message ?? "Failed to initialize worker" });
+        });
+        return; // async handling
       case "FILTER_BY_COUNTRY":
         response = handleFilterByCountry(msg.id, msg.countryCodes);
         break;
       case "SEARCH":
-        response = handleSearch(
-          msg.id,
-          msg.query,
-          msg.limit,
-          msg.filters,
-          msg.favoriteIds,
-          msg.recentIds,
-        );
+        response = handleSearch(msg.id, msg.query, msg.limit, msg.filters, msg.favoriteIds, msg.recentIds);
         break;
       case "FETCH_NEWS":
         response = handleFetchNews(msg.id, msg.limit, msg.extraPlaylistChannels);
@@ -556,5 +628,7 @@ self.onmessage = (e: MessageEvent<WorkerRequest>) => {
     };
   }
 
-  self.postMessage(response);
+  if (response) {
+    self.postMessage(response);
+  }
 };

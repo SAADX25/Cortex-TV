@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   BrowseMetadata,
   ChannelWithStream,
   HomeData,
@@ -99,11 +99,21 @@ function resolvePayload(msg: WorkerResponse): any {
 function handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
   const msg = e.data;
 
+  if (msg.type === "STATUS_UPDATE") {
+    emitStatus(msg.statusPatch);
+    return;
+  }
+
   if (msg.type === "INIT_COMPLETE") {
     initResolved = true;
     console.log(
       `[WorkerClient] Init complete - ${msg.channelCount} channels, ${msg.streamCount} streams indexed`,
     );
+    if (initResolveFn) {
+      initResolveFn();
+      initResolveFn = null;
+      initRejectFn = null;
+    }
     return;
   }
 
@@ -114,6 +124,11 @@ function handleWorkerMessage(e: MessageEvent<WorkerResponse>) {
       p?.reject(new Error(msg.message));
     } else {
       console.error("[WorkerClient] Worker error:", msg.message);
+      if (initRejectFn) {
+        initRejectFn(new Error(msg.message));
+        initResolveFn = null;
+        initRejectFn = null;
+      }
     }
     return;
   }
@@ -135,196 +150,36 @@ function request<T>(msg: Record<string, unknown>): Promise<T> {
   });
 }
 
-const CHANNELS_URL = "https://iptv-org.github.io/api/channels.json";
-const STREAMS_URL = "https://iptv-org.github.io/api/streams.json";
-
-interface InitStats {
-  channelCount: number;
-  streamCount: number;
-}
-
-function sendInitToWorker(rawChannels: any[], rawStreams: any[]): Promise<InitStats> {
-  const w = getWorker();
-  return new Promise<InitStats>((resolve, reject) => {
-    const prevHandler = w.onmessage;
-    w.onmessage = (e: MessageEvent<WorkerResponse>) => {
-      w.onmessage = prevHandler;
-      const msg = e.data;
-      if (msg.type === "INIT_COMPLETE") {
-        initResolved = true;
-        console.log(
-          `[WorkerClient] Init complete - ${msg.channelCount} channels, ${msg.streamCount} streams indexed`,
-        );
-        resolve({ channelCount: msg.channelCount, streamCount: msg.streamCount });
-      } else if (msg.type === "ERROR") {
-        reject(new Error(msg.message));
-      } else {
-        if (prevHandler) (prevHandler as any)(e);
-        reject(new Error("Unexpected worker response during init"));
-      }
-    };
-
-    w.postMessage({
-      type: "INIT",
-      rawChannels,
-      rawStreams,
-    } satisfies WorkerRequest);
-  });
-}
-
-let activeChHash = "";
-let activeStHash = "";
-const CACHE_REVALIDATE_DELAY_MS = 5 * 60 * 1000;
-let revalidateTimer: ReturnType<typeof setTimeout> | null = null;
-
-function scheduleRevalidateInBackground(): void {
-  if (revalidateTimer) return;
-  revalidateTimer = setTimeout(() => {
-    revalidateTimer = null;
-    revalidateInBackground();
-  }, CACHE_REVALIDATE_DELAY_MS);
-}
-
-async function revalidateInBackground(): Promise<void> {
-  emitStatus({
-    phase: "updating",
-    message: "Using cached data while checking for updates",
-    source: "cache",
-    error: null,
-  });
-
-  try {
-    console.log("[SWR] Background revalidation starting...");
-    const [chRes, stRes] = await Promise.all([fetch(CHANNELS_URL), fetch(STREAMS_URL)]);
-
-    if (!chRes.ok || !stRes.ok) {
-      console.warn("[SWR] Network fetch failed - keeping cached data");
-      emitStatus({
-        phase: "cached",
-        message: "Using cached channel data",
-        source: "cache",
-        error: null,
-      });
-      return;
-    }
-
-    const rawChannels: any[] = await chRes.json();
-    const rawStreams: any[] = await stRes.json();
-    const chHash = fingerprint(rawChannels);
-    const stHash = fingerprint(rawStreams);
-
-    if (chHash === activeChHash && stHash === activeStHash) {
-      console.log("[SWR] Data unchanged - skipping re-init");
-      emitStatus({
-        phase: "ready",
-        message: "Channel data is up to date",
-        source: "cache",
-        updatedAt: Date.now(),
-        error: null,
-      });
-      return;
-    }
-
-    console.log(`[SWR] Data changed - reinitialising worker (${rawChannels.length} ch, ${rawStreams.length} st)`);
-    const stats = await sendInitToWorker(rawChannels, rawStreams);
-    activeChHash = chHash;
-    activeStHash = stHash;
-
-    idbSet("channels", rawChannels, chHash).catch(() => {});
-    idbSet("streams", rawStreams, stHash).catch(() => {});
-
-    emitStatus({
-      phase: "ready",
-      message: "Channel data updated",
-      source: "network",
-      channelCount: stats.channelCount,
-      streamCount: stats.streamCount,
-      updatedAt: Date.now(),
-      error: null,
-    });
-  } catch (err: any) {
-    console.warn("[SWR] Background revalidation error:", err);
-    emitStatus({
-      phase: "cached",
-      message: "Using cached data; update check failed",
-      source: "cache",
-      error: err?.message ?? null,
-    });
-  }
-}
+let initResolveFn: (() => void) | null = null;
+let initRejectFn: ((err: Error) => void) | null = null;
 
 export function ensureWorkerData(): Promise<void> {
   if (initResolved) return Promise.resolve();
   if (initPromise) return initPromise;
 
-  initPromise = (async () => {
+  initPromise = new Promise<void>((resolve, reject) => {
+    initResolveFn = resolve;
+    initRejectFn = reject;
+
     emitStatus({
       phase: "loading",
-      message: "Loading channel database",
+      message: "Initializing worker...",
       source: null,
       error: null,
     });
 
-    const [cachedCh, cachedSt] = await Promise.all([idbGet("channels"), idbGet("streams")]);
-
-    if (cachedCh && cachedSt && cachedCh.data.length > 0) {
-      console.log(
-        `[SWR] Cache hit - ${cachedCh.data.length} channels, ${cachedSt.data.length} streams (age: ${Math.round((Date.now() - cachedCh.ts) / 1000)}s)`,
-      );
-      const stats = await sendInitToWorker(cachedCh.data, cachedSt.data);
-      activeChHash = cachedCh.hash;
-      activeStHash = cachedSt.hash;
-
-      emitStatus({
-        phase: "cached",
-        message: "Using cached channel data",
-        source: "cache",
-        channelCount: stats.channelCount,
-        streamCount: stats.streamCount,
-        updatedAt: cachedCh.ts,
-        error: null,
-      });
-      scheduleRevalidateInBackground();
-      return;
-    }
-
-    console.log("[WorkerClient] No cache - fetching from iptv-org API...");
-    const [chRes, stRes] = await Promise.all([fetch(CHANNELS_URL), fetch(STREAMS_URL)]);
-    if (!chRes.ok) throw new Error(`Channels API: HTTP ${chRes.status}`);
-    if (!stRes.ok) throw new Error(`Streams API: HTTP ${stRes.status}`);
-
-    const rawChannels: any[] = await chRes.json();
-    const rawStreams: any[] = await stRes.json();
-    console.log(`[WorkerClient] Fetched ${rawChannels.length} channels, ${rawStreams.length} streams`);
-
-    const stats = await sendInitToWorker(rawChannels, rawStreams);
-    const chHash = fingerprint(rawChannels);
-    const stHash = fingerprint(rawStreams);
-    activeChHash = chHash;
-    activeStHash = stHash;
-
-    idbSet("channels", rawChannels, chHash).catch(() => {});
-    idbSet("streams", rawStreams, stHash).catch(() => {});
-
-    emitStatus({
-      phase: "ready",
-      message: "Channel database loaded",
-      source: "network",
-      channelCount: stats.channelCount,
-      streamCount: stats.streamCount,
-      updatedAt: Date.now(),
-      error: null,
-    });
-  })();
+    const w = getWorker();
+    w.postMessage({ type: "INIT" } satisfies WorkerRequest);
+  });
 
   initPromise.catch((err: any) => {
     initPromise = null;
     initResolved = false;
     emitStatus({
       phase: "error",
-      message: "Failed to load channel database",
+      message: "Failed to initialize worker",
       source: null,
-      error: err?.message ?? "Failed to load channel data",
+      error: err?.message ?? "Failed to init worker",
     });
   });
 

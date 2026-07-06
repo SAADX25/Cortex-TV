@@ -1,17 +1,13 @@
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   SettingsPanel.tsx â€“ Slide-in settings drawer
-   Glassmorphic panel with globe controls and
-   developer information.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-
 import { useState, useEffect, useCallback, useRef } from "react";
 
 export type GlobeFps = "auto" | 30 | 60;
 
 export interface GlobeSettings {
-  rotationSpeed: number;       // 0 â€“ 2.0  (default 0.4)
-  atmosphereIntensity: number; // 0.05 â€“ 0.5 (default 0.25)
+  rotationSpeed: number;       // 0 – 2.0  (default 0.4)
+  atmosphereIntensity: number; // 0.05 – 0.5 (default 0.25)
   globeFps: GlobeFps;          // "auto" | 30 | 60 (default "auto")
+  devMonitorVisible?: boolean; // Show Dev Monitor overlay
+  autoRotate: boolean;         // Enable/disable globe auto-rotation
 }
 
 export interface PlaylistConfig {
@@ -34,7 +30,7 @@ interface SettingsPanelProps {
   onBrowsePlaylist?: () => void;
 }
 
-/* â”€â”€ Reusable slider row (touch-friendly) â”€â”€ */
+/* ── Reusable slider row (touch-friendly) ── */
 function SliderRow({
   label,
   value,
@@ -82,7 +78,7 @@ function SliderRow({
   );
 }
 
-/* â”€â”€ Toggle row â”€â”€ */
+/* ── Toggle row ── */
 function ToggleRow({
   label,
   description,
@@ -105,16 +101,14 @@ function ToggleRow({
         )}
       </div>
       <div
-        className={`relative shrink-0 h-8 w-[52px] rounded-full transition-colors duration-300 ${
-          checked
+        className={`relative shrink-0 h-8 w-[52px] rounded-full transition-colors duration-300 ${checked
             ? "bg-cyan-500 shadow-[0_0_14px_rgba(0,255,255,0.35)]"
             : "bg-white/10"
-        }`}
+          }`}
       >
         <div
-          className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-transform duration-300 ${
-            checked ? "translate-x-[22px]" : "translate-x-1"
-          }`}
+          className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow-md transition-transform duration-300 ${checked ? "translate-x-[22px]" : "translate-x-1"
+            }`}
         />
         <input
           type="checkbox"
@@ -198,37 +192,49 @@ export default function SettingsPanel({
       className={`fixed top-0 mobile-safe-panel-top md:top-0 bottom-0 left-0 right-0 z-[190] ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
     >
       {/* Dim backdrop */}
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0 bg-black/40" onClick={handleClose} />
 
       {/* Panel */}
       <div
         onClick={(e) => e.stopPropagation()}
         className={`absolute top-0 bottom-0 mobile-safe-panel-nav-clearance md:bottom-0 left-0 w-full md:w-[380px] max-w-full md:max-w-[85vw] flex flex-col bg-[#0f172a] md:bg-black/70 md:backdrop-blur-2xl border-r border-white/[0.06] shadow-[20px_0_60px_rgba(0,0,0,0.5)] ${animClass}`}
       >
-        {/* â”€â”€ Native-style Header â”€â”€ */}
+        {/* ── Native-style Header ── */}
         <div className="flex items-center justify-center px-6 pt-4 md:pt-6 pb-4 border-b border-white/[0.06]">
           <h2 className="text-lg font-bold text-white tracking-wide">
             Settings
           </h2>
         </div>
 
-        {/* â”€â”€ Content â”€â”€ */}
+        {/* ── Content ── */}
         <div className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-5 pt-5 pb-6 md:pb-5 space-y-6">
 
-          {/* â•â• Globe Controls Card â•â• */}
+          {/* ══ Globe Controls Card ══ */}
           <section>
             <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3 ml-2">
               Globe Controls
             </h3>
             <div className="bg-[#112240] rounded-2xl p-4 space-y-1">
-              <SliderRow
-                label="Rotation Speed"
-                value={settings.rotationSpeed}
-                min={0}
-                max={2}
-                step={0.05}
-                onChange={(v) => update({ rotationSpeed: v })}
+              <ToggleRow
+                label="Auto Rotation"
+                description="Make the globe spin automatically"
+                checked={!!settings.autoRotate}
+                onChange={(on) => update({ autoRotate: on })}
               />
+
+              {settings.autoRotate && (
+                <>
+                  <div className="w-full border-t border-white/[0.04] my-1" />
+                  <SliderRow
+                    label="Rotation Speed"
+                    value={settings.rotationSpeed}
+                    min={0}
+                    max={2}
+                    step={0.05}
+                    onChange={(v) => update({ rotationSpeed: v })}
+                  />
+                </>
+              )}
 
               <div className="w-full border-t border-white/[0.04] my-1" />
 
@@ -252,6 +258,18 @@ export default function SettingsPanel({
                     max={0.5}
                     step={0.01}
                     onChange={(v) => update({ atmosphereIntensity: v })}
+                  />
+                </>
+              )}
+
+              {(import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_MONITOR === "true") && (
+                <>
+                  <div className="w-full border-t border-white/[0.04] my-1" />
+                  <ToggleRow
+                    label="Developer Monitor"
+                    description="Show performance overlay (FPS, Memory, WebGL stats)"
+                    checked={!!settings.devMonitorVisible}
+                    onChange={(on) => update({ devMonitorVisible: on })}
                   />
                 </>
               )}
@@ -281,24 +299,22 @@ export default function SettingsPanel({
                 <div className="flex items-center h-11 rounded-xl bg-white/[0.04] p-1 gap-0.5">
                   <button
                     onClick={() => setAuthMode("m3u")}
-                    className={`flex-1 h-full rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
-                      authMode === "m3u"
+                    className={`flex-1 h-full rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${authMode === "m3u"
                         ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
                         : "text-gray-400 active:text-white/60 active:bg-white/[0.04]"
-                    }`}
+                      }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><polyline points="13 2 13 9 20 9" /></svg>
                     M3U Link
                   </button>
                   <button
                     onClick={() => setAuthMode("xtream")}
-                    className={`flex-1 h-full rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${
-                      authMode === "xtream"
+                    className={`flex-1 h-full rounded-lg text-[13px] font-semibold tracking-wide transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5 ${authMode === "xtream"
                         ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
                         : "text-gray-400 active:text-white/60 active:bg-white/[0.04]"
-                    }`}
+                      }`}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                     Xtream Login
                   </button>
                 </div>
@@ -340,7 +356,7 @@ export default function SettingsPanel({
                         </>
                       ) : (
                         <>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
                           Load Playlist
                         </>
                       )}
@@ -350,7 +366,7 @@ export default function SettingsPanel({
                       disabled={!playlist.url && playlistCount === 0}
                       className="shrink-0 flex items-center justify-center gap-2 rounded-xl h-12 px-5 border border-white/10 bg-white/5 text-sm font-medium text-white/50 active:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                       Clear
                     </button>
                   </div>
@@ -414,9 +430,9 @@ export default function SettingsPanel({
                         aria-label={xtShowPass ? "Hide password" : "Show password"}
                       >
                         {xtShowPass ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" /><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" /><line x1="1" y1="1" x2="23" y2="23" /><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" /></svg>
                         ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                         )}
                       </button>
                     </div>
@@ -447,7 +463,7 @@ export default function SettingsPanel({
                       </>
                     ) : (
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><polyline points="10 17 15 12 10 7" /><line x1="15" y1="12" x2="3" y2="12" /></svg>
                         Login &amp; Load Channels
                       </>
                     )}
@@ -462,7 +478,7 @@ export default function SettingsPanel({
                     disabled={!xtServer && !xtPort && !xtUser && !xtPass && !playlist.url && playlistCount === 0}
                     className="w-full flex items-center justify-center gap-2 rounded-xl h-11 border border-white/10 bg-white/[0.03] text-sm font-medium text-white/40 active:bg-white/[0.08] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                     Clear All
                   </button>
                 </div>
@@ -485,7 +501,7 @@ export default function SettingsPanel({
                       onClick={onBrowsePlaylist}
                       className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 rounded-xl mt-4 transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(0,255,255,0.15)] cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" /><line x1="3" y1="6" x2="3.01" y2="6" /><line x1="3" y1="12" x2="3.01" y2="12" /><line x1="3" y1="18" x2="3.01" y2="18" /></svg>
                       Browse Custom Playlist
                     </button>
                   )}
@@ -589,11 +605,10 @@ function InfoRow({
     <div className="flex items-center justify-between py-2.5 border-b border-white/[0.04] last:border-0">
       <span className="text-sm text-white/40">{label}</span>
       <span
-        className={`text-sm font-medium ${
-          highlight
+        className={`text-sm font-medium ${highlight
             ? "text-cyan-400 drop-shadow-[0_0_6px_rgba(0,255,255,0.5)]"
             : "text-white/70"
-        }`}
+          }`}
       >
         {value}
       </span>

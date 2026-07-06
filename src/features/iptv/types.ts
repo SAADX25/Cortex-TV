@@ -1,4 +1,4 @@
-﻿/* Shared message protocol between the main thread and the IPTV Web Worker. */
+/* Shared message protocol between the main thread and the IPTV Web Worker. */
 
 export type { Channel, ChannelWithStream, Stream } from "@/shared/types";
 import type { ChannelWithStream } from "@/shared/types";
@@ -36,12 +36,28 @@ export interface HomeData {
   streamCount: number;
 }
 
+export type IPTVDataPhase =
+  | "idle"
+  | "loading"
+  | "cached"
+  | "updating"
+  | "ready"
+  | "error";
+
+export interface IPTVDataStatus {
+  phase: IPTVDataPhase;
+  message: string;
+  source: "cache" | "network" | null;
+  channelCount: number;
+  streamCount: number;
+  updatedAt: number | null;
+  error: string | null;
+}
+
 /* Main -> Worker requests */
 
 export interface InitRequest {
   type: "INIT";
-  rawChannels: any[];
-  rawStreams: any[];
 }
 
 export interface FilterByCountryRequest {
@@ -102,6 +118,11 @@ export interface InitCompleteResponse {
   streamCount: number;
 }
 
+export interface StatusUpdateResponse {
+  type: "STATUS_UPDATE";
+  statusPatch: Partial<IPTVDataStatus>;
+}
+
 export interface FilterResultResponse {
   type: "FILTER_RESULT";
   id: number;
@@ -146,6 +167,7 @@ export interface ErrorResponse {
 
 export type WorkerResponse =
   | InitCompleteResponse
+  | StatusUpdateResponse
   | FilterResultResponse
   | SearchResultResponse
   | NewsResultResponse

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { GlobeFps } from "@/stores/useUIStore";
+import { useUIStore, type GlobeFps } from "@/stores/useUIStore";
 
 interface DebugStats {
   geometries: number;
@@ -8,17 +8,11 @@ interface DebugStats {
   heapMb: number | null;
 }
 
-interface DebugPanelProps {
-  globeFps: GlobeFps;
-}
-
-export function DebugPanel({ globeFps }: DebugPanelProps) {
+export function DebugPanel() {
   const isDevEnabled = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEV_MONITOR === "true";
 
-  const [isVisible, setIsVisible] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("cortex-tv-dev-monitor-visible") === "true";
-  });
+  const { globeFps, devMonitorVisible } = useUIStore((s) => s.globeSettings);
+  const setGlobeSettings = useUIStore((s) => s.setGlobeSettings);
 
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -36,21 +30,20 @@ export function DebugPanel({ globeFps }: DebugPanelProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "d") {
         e.preventDefault();
-        setIsVisible((prev) => {
-          const next = !prev;
-          localStorage.setItem("cortex-tv-dev-monitor-visible", String(next));
-          return next;
+        setGlobeSettings({
+          ...useUIStore.getState().globeSettings,
+          devMonitorVisible: !useUIStore.getState().globeSettings.devMonitorVisible,
         });
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isDevEnabled]);
+  }, [isDevEnabled, setGlobeSettings]);
 
   // Polling for stats
   useEffect(() => {
-    if (!isDevEnabled || !isVisible) return;
+    if (!isDevEnabled || !devMonitorVisible) return;
 
     const interval = setInterval(() => {
       let geometries = 0;
@@ -72,10 +65,10 @@ export function DebugPanel({ globeFps }: DebugPanelProps) {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isDevEnabled, isVisible, globeFps]);
+  }, [isDevEnabled, devMonitorVisible, globeFps]);
 
   // Completely remove from DOM in normal prod or if toggled off
-  if (!isDevEnabled || !isVisible) return null;
+  if (!isDevEnabled || !devMonitorVisible) return null;
 
   return (
     <div className={`fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-2 ${isExpanded ? 'pointer-events-auto' : 'pointer-events-none'}`}>

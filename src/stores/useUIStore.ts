@@ -10,6 +10,8 @@ export interface GlobeSettings {
   rotationSpeed: number;       // 0 - 2.0 (default 0.4)
   atmosphereIntensity: number; // 0.05 - 0.5 (default 0.25)
   globeFps: GlobeFps;          // "auto" | 30 | 60 (default "auto")
+  devMonitorVisible?: boolean; // Show Dev Monitor overlay
+  autoRotate: boolean;         // Enable/disable globe auto-rotation
 }
 
 export type ActiveTab = "globe" | "search" | "favorites" | "settings" | "news";
@@ -20,6 +22,8 @@ const DEFAULT_SETTINGS: GlobeSettings = {
   rotationSpeed: 0.4,
   atmosphereIntensity: 0.25,
   globeFps: "auto",
+  devMonitorVisible: false,
+  autoRotate: false,
 };
 
 function loadSettings(): GlobeSettings {
