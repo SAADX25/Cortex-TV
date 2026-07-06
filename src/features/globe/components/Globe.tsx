@@ -1,4 +1,4 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Globe.tsx â€“ Interactive 3D Globe using react-globe.gl
    Neon-styled country polygons with CDN textures.
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -320,8 +320,8 @@ const NIGHT_SKY_URL =
   "https://unpkg.com/three-globe/example/img/night-sky.png";
 const GEOJSON_URL =
   "https://cdn.jsdelivr.net/gh/vasturiano/react-globe.gl@master/example/datasets/ne_110m_admin_0_countries.geojson";
-const GLOBE_TARGET_FPS = 20;
-const GLOBE_FRAME_MS = 1000 / GLOBE_TARGET_FPS;
+// Auto-mode FPS target (matches previous GLOBE_TARGET_FPS of 20)
+const AUTO_GLOBE_TARGET_FPS = 20;
 const MAX_GLOBE_PIXEL_RATIO = 1;
 const MOBILE_TARGET_INTERVAL_MS = 250;
 const GLOBE_RENDERER_CONFIG = {
@@ -329,6 +329,11 @@ const GLOBE_RENDERER_CONFIG = {
   alpha: true,
   powerPreference: "low-power" as WebGLPowerPreference,
 };
+
+/* Detect prefers-reduced-motion */
+const PREFERS_REDUCED_MOTION =
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* â”€â”€ Public types â”€â”€ */
 export interface CountryInfo {
@@ -340,12 +345,16 @@ export interface GlobeClickInfo {
   country: CountryInfo | null;
 }
 
+export type GlobeFps = "auto" | 30 | 60;
+
 interface GlobeProps {
   onCountryClick?: (info: GlobeClickInfo) => void;
   isNightMode?: boolean;
   rotationSpeed?: number;
   atmosphereIntensity?: number;
   focusCountryIso?: string | null;
+  /** Globe FPS cap: "auto" uses quality-based logic, 30 or 60 caps render loop */
+  globeFps?: GlobeFps;
   /** Pause auto-rotation and heavy renders (search open, video playing) */
   paused?: boolean;
 }
@@ -355,6 +364,7 @@ function GlobeInner({
   isNightMode = false,
   rotationSpeed = 0.4,
   atmosphereIntensity = 0.25,
+  globeFps = "auto",
   focusCountryIso,
   paused = false,
 }: GlobeProps) {
@@ -436,10 +446,47 @@ function GlobeInner({
   useEffect(() => {
     return () => {
       const globe = globeRef.current;
-      const renderer = globe?.renderer?.();
-      renderer?.setAnimationLoop?.(null);
-      renderer?.dispose?.();
-      renderer?.forceContextLoss?.();
+      if (!globe) return;
+      const renderer = globe.renderer?.();
+      const scene = globe.scene?.();
+      
+      if (renderer) {
+        renderer.setAnimationLoop?.(null);
+      }
+      
+      if (scene) {
+        scene.traverse((object: any) => {
+          if (object.geometry) {
+            object.geometry.dispose();
+          }
+          if (object.material) {
+            if (Array.isArray(object.material)) {
+              object.material.forEach((m: any) => m.dispose());
+            } else {
+              object.material.dispose();
+            }
+          }
+          if (object.material?.map) object.material.map.dispose();
+          if (object.material?.lightMap) object.material.lightMap.dispose();
+          if (object.material?.bumpMap) object.material.bumpMap.dispose();
+          if (object.material?.normalMap) object.material.normalMap.dispose();
+          if (object.material?.specularMap) object.material.specularMap.dispose();
+          if (object.material?.envMap) object.material.envMap.dispose();
+        });
+      }
+
+      if (renderer) {
+        renderer.dispose?.();
+        renderer.forceContextLoss?.();
+      }
+      
+      if (typeof globe._destructor === 'function') {
+        try { globe._destructor(); } catch (e) {}
+      }
+      
+      if (import.meta.env.DEV) {
+        (window as any).__cortexGlobeRendererInfo = { geometries: 0, textures: 0 };
+      }
     };
   }, []);
 
@@ -461,14 +508,38 @@ function GlobeInner({
     if (!globe) return;
     const renderer = globe.renderer?.();
     if (!renderer) return;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO));
+    
+    // Auto mode tweaks for performance
+    const isAuto = globeFps === "auto";
+    const targetPixelRatio = isAuto 
+      ? Math.min(window.devicePixelRatio || 1, 0.75) // Lower resolution for Auto to save GPU
+      : Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO);
+    renderer.setPixelRatio(targetPixelRatio);
+    
+    // Export renderer stats for DebugPanel
+    if (import.meta.env.DEV) {
+      (window as any).__cortexGlobeRendererInfo = renderer.info.memory;
+    }
+    
     let lastFrame = 0;
+
+    /* Compute the frame interval (ms) from globeFps prop */
+    const computeFrameMs = () => {
+      if (globeFps === 30) return 1000 / 30;
+      if (globeFps === 60) return 1000 / 60;
+      // "auto" mode: use quality-based FPS. Respect prefers-reduced-motion.
+      const autoFps = PREFERS_REDUCED_MOTION
+        ? Math.min(AUTO_GLOBE_TARGET_FPS, 15)
+        : AUTO_GLOBE_TARGET_FPS;
+      return 1000 / autoFps;
+    };
+    const frameMs = computeFrameMs();
 
     if (paused) {
       renderer.setAnimationLoop(null);
     } else {
       renderer.setAnimationLoop((time: number = performance.now()) => {
-        if (time - lastFrame < GLOBE_FRAME_MS) return;
+        if (time - lastFrame < frameMs) return;
         lastFrame = time;
         const ctrl = globe.controls?.();
         if (ctrl) ctrl.update();
@@ -770,7 +841,7 @@ function GlobeInner({
   /* â”€â”€ Direct mouse click on polygon (PC/Desktop) â”€â”€ */
   const handlePolygonClick = useCallback(
     (polygon: any, _event: MouseEvent, _coords: { lat: number; lng: number; altitude: number }) => {
-      if (paused) return;
+      if (paused || globeFps === "auto") return; // Reduce interaction overhead in auto mode
       if (polygon) selectFeature(polygon);
     },
     [paused, selectFeature]

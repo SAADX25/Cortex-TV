@@ -1,5 +1,8 @@
-﻿import type { ReactNode } from "react";
-
+import type { ReactNode } from "react";
+import type { GlobeFps } from "@/stores/useUIStore";
+import { SidebarSection } from "./SidebarSection";
+import { SettingCard } from "./SettingCard";
+import { SegmentedControl, type SegmentedOption } from "./SegmentedControl";
 interface LeftSidebarProps {
   isNightMode: boolean;
   onToggleNightMode: () => void;
@@ -11,6 +14,8 @@ interface LeftSidebarProps {
   onOpenSettings: () => void;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  globeFps: GlobeFps;
+  onSetGlobeFps: (fps: GlobeFps) => void;
 }
 
 function SearchIcon() {
@@ -148,6 +153,8 @@ export default function LeftSidebar({
   onOpenSettings,
   collapsed,
   onToggleCollapsed,
+  globeFps,
+  onSetGlobeFps,
 }: LeftSidebarProps) {
   return (
     <>
@@ -183,37 +190,55 @@ export default function LeftSidebar({
         </div>
 
         {/* START section */}
-        <div className="shrink-0 px-3">
-          <p className="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-[0.26em] text-cyan-300/40">Start</p>
+        <SidebarSection title="Start">
           <div className="space-y-1">
             <NavItem label="Search Channels" detail="Find any public stream" icon={<SearchIcon />} onClick={onOpenSearch} />
             <NavItem label="Favorites" detail="Saved channels" icon={<StarIcon filled={showFavorites} />} active={showFavorites} onClick={onToggleFavorites} />
             <NavItem label="Quick News" detail="Live news index" icon={<NewsIcon />} active={showNews} onClick={onToggleNews} />
           </div>
-        </div>
+        </SidebarSection>
 
         {/* MODE section */}
-        <div className="mt-4 shrink-0 px-3">
-          <p className="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-[0.26em] text-cyan-300/40">Mode</p>
-          <div className="overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.03] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+        <SidebarSection title="Mode">
+          <SettingCard>
             <div className="grid grid-cols-2 gap-1">
               <button
                 type="button"
-                className="h-9 rounded-lg bg-cyan-300 text-[12px] font-black text-slate-950 shadow-[0_0_18px_rgba(34,211,238,0.24)]"
+                className="h-9 rounded-lg bg-cyan-300 text-[12px] font-black text-slate-950 shadow-[0_0_18px_rgba(34,211,238,0.24)] transition-all"
               >
                 TV
               </button>
               <button
                 type="button"
                 disabled
-                className="h-9 cursor-not-allowed rounded-lg text-[12px] font-bold text-white/28"
+                className="h-9 cursor-not-allowed rounded-lg text-[12px] font-bold text-white/28 transition-all"
                 title="Radio coming soon"
               >
                 Radio
               </button>
             </div>
-          </div>
-        </div>
+          </SettingCard>
+        </SidebarSection>
+
+        {/* PERFORMANCE section */}
+        <SidebarSection title="Performance">
+          <SettingCard>
+            <p className="mb-1.5 px-1 pt-0.5 text-[11px] font-semibold text-white/60">Globe FPS</p>
+            <p className="mb-2 px-1 text-[10px] font-medium text-white/30">
+              {globeFps === 60 ? "⚠ Higher GPU usage" : "Auto recommended"}
+            </p>
+            
+            <SegmentedControl
+              value={globeFps}
+              onChange={onSetGlobeFps}
+              options={[
+                { value: "auto", label: "Auto" },
+                { value: 30, label: "30" },
+                { value: 60, label: "60", tooltip: "Smoother, higher GPU usage" },
+              ]}
+            />
+          </SettingCard>
+        </SidebarSection>
 
         {/* Spacer */}
         <div className="flex-1" />

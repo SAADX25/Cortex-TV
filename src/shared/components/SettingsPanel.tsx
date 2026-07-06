@@ -1,4 +1,4 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    SettingsPanel.tsx â€“ Slide-in settings drawer
    Glassmorphic panel with globe controls and
    developer information.
@@ -6,9 +6,12 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 
+export type GlobeFps = "auto" | 30 | 60;
+
 export interface GlobeSettings {
   rotationSpeed: number;       // 0 â€“ 2.0  (default 0.4)
   atmosphereIntensity: number; // 0.05 â€“ 0.5 (default 0.25)
+  globeFps: GlobeFps;          // "auto" | 30 | 60 (default "auto")
 }
 
 export interface PlaylistConfig {

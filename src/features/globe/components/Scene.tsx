@@ -1,10 +1,10 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
    Scene.tsx â€“ Wraps the react-globe.gl Globe
    and forwards country-click events to the parent.
    â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 import { useCallback } from "react";
-import Globe, { type GlobeClickInfo } from "./Globe";
+import Globe, { type GlobeClickInfo, type GlobeFps } from "./Globe";
 
 interface SceneProps {
   onCountryClick?: (info: GlobeClickInfo) => void;
@@ -12,6 +12,7 @@ interface SceneProps {
   rotationSpeed?: number;
   atmosphereIntensity?: number;
   focusCountryIso?: string | null;
+  globeFps?: GlobeFps;
   paused?: boolean;
 }
 
@@ -21,6 +22,7 @@ export default function Scene({
   rotationSpeed,
   atmosphereIntensity,
   focusCountryIso,
+  globeFps,
   paused,
 }: SceneProps) {
   const handleGlobeClick = useCallback(
@@ -43,6 +45,7 @@ export default function Scene({
       rotationSpeed={rotationSpeed}
       atmosphereIntensity={atmosphereIntensity}
       focusCountryIso={focusCountryIso}
+      globeFps={globeFps}
       paused={paused}
     />
   );

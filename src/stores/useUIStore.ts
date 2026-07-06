@@ -4,9 +4,12 @@ import { create } from "zustand";
 import type { CountryInfo } from "@/features/globe/components/Globe";
 import { usePlayerStore } from "./usePlayerStore";
 
+export type GlobeFps = "auto" | 30 | 60;
+
 export interface GlobeSettings {
   rotationSpeed: number;       // 0 - 2.0 (default 0.4)
   atmosphereIntensity: number; // 0.05 - 0.5 (default 0.25)
+  globeFps: GlobeFps;          // "auto" | 30 | 60 (default "auto")
 }
 
 export type ActiveTab = "globe" | "search" | "favorites" | "settings" | "news";
@@ -16,6 +19,7 @@ const SETTINGS_KEY = "cortex_settings";
 const DEFAULT_SETTINGS: GlobeSettings = {
   rotationSpeed: 0.4,
   atmosphereIntensity: 0.25,
+  globeFps: "auto",
 };
 
 function loadSettings(): GlobeSettings {
