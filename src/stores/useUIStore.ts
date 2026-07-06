@@ -1,26 +1,16 @@
-/* ──────────────────────────────────────────────────
-   useUIStore.ts – Navigation, theme, globe settings,
-   and splash state.
-   
-   Components subscribe to individual selectors so that
-   e.g. toggling night mode only re-renders Scene +
-   the dark-mode button — not the entire App tree.
-   ────────────────────────────────────────────────── */
+/* UI store: navigation, theme, globe settings, and splash state. */
 
 import { create } from "zustand";
-import type { CountryInfo } from "../components/Globe";
+import type { CountryInfo } from "@/features/globe/components/Globe";
 import { usePlayerStore } from "./usePlayerStore";
 
-/* ── Types ── */
-
 export interface GlobeSettings {
-  rotationSpeed: number;       // 0 – 2.0  (default 0.4)
-  atmosphereIntensity: number; // 0.05 – 0.5 (default 0.25)
+  rotationSpeed: number;       // 0 - 2.0 (default 0.4)
+  atmosphereIntensity: number; // 0.05 - 0.5 (default 0.25)
 }
 
 export type ActiveTab = "globe" | "search" | "favorites" | "settings" | "news";
 
-/* ── LocalStorage keys ── */
 const SETTINGS_KEY = "cortex_settings";
 
 const DEFAULT_SETTINGS: GlobeSettings = {
@@ -36,25 +26,15 @@ function loadSettings(): GlobeSettings {
   }
 }
 
-/* ── Store ── */
-
 interface UIState {
-  /* Navigation */
   activeTab: ActiveTab;
   selectedCountry: CountryInfo | null;
   focusCountryIso: string | null;
-
-  /* Theme */
   isNightMode: boolean;
-
-  /* Globe settings (persisted) */
   globeSettings: GlobeSettings;
-
-  /* Splash */
   splashVisible: boolean;
   splashFading: boolean;
 
-  /* ── Actions ── */
   setActiveTab: (tab: ActiveTab) => void;
   selectCountry: (country: CountryInfo | null) => void;
   setFocusCountryIso: (iso: string | null) => void;
@@ -63,18 +43,10 @@ interface UIState {
   setGlobeSettings: (s: GlobeSettings) => void;
   setSplashFading: (v: boolean) => void;
   setSplashVisible: (v: boolean) => void;
-
-  /**
-   * Coordinated navigation: switches tab and clears
-   * country selection + player in one atomic update.
-   * Prevents impossible states (e.g. favorites tab
-   * with a country sidebar still open).
-   */
   navigateTo: (tab: ActiveTab) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  /* Initial values */
   activeTab: "globe",
   selectedCountry: null,
   focusCountryIso: null,
@@ -83,7 +55,6 @@ export const useUIStore = create<UIState>((set) => ({
   splashVisible: true,
   splashFading: false,
 
-  /* Simple setters */
   setActiveTab: (tab) => set({ activeTab: tab }),
   selectCountry: (country) => set({ selectedCountry: country }),
   setFocusCountryIso: (iso) => set({ focusCountryIso: iso }),
@@ -97,7 +68,6 @@ export const useUIStore = create<UIState>((set) => ({
     set({ globeSettings: s });
   },
 
-  /* Coordinated transition — clears cross-cutting state atomically */
   navigateTo: (tab) => {
     usePlayerStore.getState().close();
     set({ activeTab: tab, selectedCountry: null });

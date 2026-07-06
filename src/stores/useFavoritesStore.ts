@@ -9,7 +9,7 @@
    ────────────────────────────────────────────────── */
 
 import { create } from "zustand";
-import type { ChannelWithStream } from "../hooks/useIPTV";
+import type { ChannelWithStream } from "@/shared/types";
 
 const FAVORITES_KEY = "cortex_favorites";
 

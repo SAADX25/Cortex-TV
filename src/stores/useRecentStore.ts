@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChannelWithStream } from "../workers/iptvWorker.types";
+import type { ChannelWithStream } from "@/shared/types";
 
 const RECENTS_KEY = "cortex_recent_channels";
 const MAX_RECENTS = 24;
