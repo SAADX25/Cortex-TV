@@ -1,6 +1,7 @@
-﻿import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import * as THREE from "three";
 import { geoJsonToLineSegments } from "../utils/geoJsonToLines";
+import { getCachedGeoJson, setCachedGeoJson } from "../data/geoJsonCache";
 
 const BORDER_COLOR = new THREE.Color("#00ffff");
 
@@ -18,15 +19,32 @@ export default function Borders({
   const [positions, setPositions] = useState<Float32Array | null>(null);
 
   useEffect(() => {
-    fetch(geoJsonUrl)
-      .then((res) => {
+    let active = true;
+
+    async function loadData() {
+      try {
+        const cached = await getCachedGeoJson(geoJsonUrl);
+        if (cached && active) {
+          setPositions(geoJsonToLineSegments(cached, radius));
+          return;
+        }
+
+        const res = await fetch(geoJsonUrl);
         if (!res.ok) throw new Error(`Failed to load ${geoJsonUrl}`);
-        return res.json();
-      })
-      .then((json: GeoJSON.FeatureCollection) => {
-        setPositions(geoJsonToLineSegments(json, radius));
-      })
-      .catch((err) => console.error("[Borders]", err));
+        const json: GeoJSON.FeatureCollection = await res.json();
+        
+        if (active) {
+          setPositions(geoJsonToLineSegments(json, radius));
+          await setCachedGeoJson(geoJsonUrl, json);
+        }
+      } catch (err) {
+        console.error("[Borders]", err);
+      }
+    }
+
+    loadData();
+
+    return () => { active = false; };
   }, [geoJsonUrl, radius]);
 
   const geometry = useMemo(() => {
