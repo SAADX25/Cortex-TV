@@ -596,7 +596,8 @@ export default function AppLayout() {
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           onPlayChannel={playChannel}
-          onBack={closePlayer}
+          onBack={closePlayer}
+          customProxyUrl={globeSettings.customProxyUrl}
         />
       )}
 

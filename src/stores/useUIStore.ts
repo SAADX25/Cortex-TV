@@ -12,6 +12,8 @@ export interface GlobeSettings {
   globeFps: GlobeFps;          // "auto" | 30 | 60 (default "auto")
   devMonitorVisible?: boolean; // Show Dev Monitor overlay
   autoRotate: boolean;         // Enable/disable globe auto-rotation
+  highQualityGraphics: boolean;// Use native resolution
+  customProxyUrl?: string;     // Custom CORS proxy URL for web
 }
 
 export type ActiveTab = "globe" | "search" | "favorites" | "settings" | "news";
@@ -24,6 +26,8 @@ const DEFAULT_SETTINGS: GlobeSettings = {
   globeFps: "auto",
   devMonitorVisible: false,
   autoRotate: false,
+  highQualityGraphics: false,
+  customProxyUrl: "",
 };
 
 function loadSettings(): GlobeSettings {

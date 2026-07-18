@@ -1,4 +1,4 @@
-﻿/* ------------------------------------------------------------------------------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------------------------------------------------------------------------------
    Scene.tsx --- Wraps the react-globe.gl Globe
    and forwards country-click events to the parent.
    ------------------------------------------------------------------------------------------------------------------------------------------------------ */
@@ -16,6 +16,7 @@ interface SceneProps {
   globeFps?: GlobeFps;
   paused?: boolean;
   autoRotate?: boolean;
+  highQualityGraphics?: boolean;
 }
 
 export default function Scene({
@@ -28,6 +29,7 @@ export default function Scene({
   globeFps,
   paused,
   autoRotate,
+  highQualityGraphics,
 }: SceneProps) {
   const handleGlobeClick = useCallback(
     (info: GlobeClickInfo) => {
@@ -53,6 +55,7 @@ export default function Scene({
       globeFps={globeFps}
       paused={paused}
       autoRotate={autoRotate}
+      highQualityGraphics={highQualityGraphics}
     />
   );
 }

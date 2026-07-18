@@ -1,4 +1,4 @@
-﻿/* ------------------------------------------------------------------------------------------------------------------------------------------
+/* ------------------------------------------------------------------------------------------------------------------------------------------
    Globe.tsx --- Interactive 3D Globe using react-globe.gl
    Neon-styled country polygons with CDN textures.
    ------------------------------------------------------------------------------------------------------------------------------------------ */
@@ -361,6 +361,8 @@ interface GlobeProps {
   paused?: boolean;
   /** Enable/disable auto-rotation */
   autoRotate?: boolean;
+  /** Use native pixel ratio for sharp rendering */
+  highQualityGraphics?: boolean;
 }
 
 function GlobeInner({
@@ -373,6 +375,7 @@ function GlobeInner({
   selectedCountryIso,
   paused = false,
   autoRotate = false,
+  highQualityGraphics = false,
 }: GlobeProps) {
   const globeRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -443,7 +446,8 @@ function GlobeInner({
     controls.minDistance = 150;
     controls.maxDistance = 500;
 
-    globe.renderer?.()?.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO));
+    // Pixel ratio is set in the paused effect
+    globe.renderer?.()?.setPixelRatio(1);
 
     // Slight initial tilt for a nicer default view
     globe.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0);
@@ -515,9 +519,11 @@ function GlobeInner({
     
     // Auto mode tweaks for performance
     const isAuto = globeFps === "auto";
-    const targetPixelRatio = isAuto 
-      ? Math.min(window.devicePixelRatio || 1, 0.75) // Lower resolution for Auto to save GPU
-      : Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO);
+    const targetPixelRatio = highQualityGraphics
+      ? Math.min(window.devicePixelRatio || 1, 3) // Up to 3x for sharp rendering on retina displays
+      : isAuto 
+        ? Math.min(window.devicePixelRatio || 1, 0.75) // Lower resolution for Auto to save GPU
+        : Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO);
     renderer.setPixelRatio(targetPixelRatio);
     
     // Export renderer stats for DebugPanel
@@ -555,7 +561,7 @@ function GlobeInner({
     return () => {
       renderer.setAnimationLoop(null);
     };
-  }, [paused]);
+  }, [paused, highQualityGraphics, globeFps]);
 
   /* ------ Fly to country when focusCountryIso changes ------ */
   useEffect(() => {
@@ -833,9 +839,9 @@ function GlobeInner({
       const elapsed = Date.now() - down.time;
 
       /* Quick tap: < 12 px movement and < 300 ms.
-         Only trigger crosshair-based selection for touch/pen (mobile);
-         mouse clicks are handled by onPolygonClick instead. */
-      if (dist < 12 && elapsed < 300 && e.pointerType !== "mouse") {
+         Trigger crosshair-based selection for touch/pen, OR if mouse clicks directly on the center crosshair. */
+      const isCenter = Math.abs(e.clientX - window.innerWidth / 2) < 30 && Math.abs(e.clientY - window.innerHeight / 2) < 30;
+      if (dist < 12 && elapsed < 300 && (e.pointerType !== "mouse" || isCenter)) {
         selectCountryAtCenter();
       }
     },
@@ -904,7 +910,7 @@ function GlobeInner({
           <path d="M2 12h20" />
         </svg>
         <span className="relative text-[11px] font-bold leading-none">
-          {uiLang === "en" ? "Ø¹" : "EN"}
+          {uiLang === "en" ? "ع" : "EN"}
         </span>
       </button>
 

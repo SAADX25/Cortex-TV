@@ -1,4 +1,4 @@
-﻿/* ──────────────────────────────────────────────────
+/* ──────────────────────────────────────────────────
    Player.tsx – HLS Video Player using hls.js
    Native <video> element with smart error handling,
    retry logic, and detailed error categorisation.
@@ -26,6 +26,7 @@ interface PlayerProps {
   onPlayChannel?: (ch: ChannelWithStream) => void;
   /** Called by the green back button in the sidebar header */
   onBack?: () => void;
+  customProxyUrl?: string;
 }
 
 /*
@@ -119,13 +120,13 @@ function isSegmentUrl(url: string): boolean {
   }
 }
 
-function proxyRewrite(url: string): string {
+function proxyRewrite(url: string, activeProxyUrl: string): string {
   if (IS_ELECTRON) return url;                       // Electron handles headers itself
 
   if (IS_NATIVE) {
     // Android APK — only route known blocked CDNs through Cloudflare Worker
     if (needsCloudProxy(url)) {
-      const proxied = CLOUD_PROXY + encodeURIComponent(url);
+      const proxied = activeProxyUrl + encodeURIComponent(url);
       console.log(`[Player] Cloud proxy: ${url} → ${proxied}`);
       return proxied;
     }
@@ -141,7 +142,7 @@ function proxyRewrite(url: string): string {
      * Sub-playlists are also rewritten to loop back through the Worker.
      */
     if (needsCloudProxy(url)) {
-      const proxied = CLOUD_PROXY + encodeURIComponent(url);
+      const proxied = activeProxyUrl + encodeURIComponent(url);
       console.log(`[Player] CF Worker (browser): ${url} → ${proxied}`);
       return proxied;
     }
@@ -174,7 +175,7 @@ function proxyRewrite(url: string): string {
  * "720p/index.m3u8" → "cdn.example.com/live/720p/index.m3u8" (correct).
  * The loader then proxies that correct CDN URL through the Worker.
  */
-function createNativeProxyLoader(debugFn?: (msg: string) => void) {
+function createNativeProxyLoader(activeProxyUrl: string, debugFn?: (msg: string) => void) {
   const DefaultLoader = Hls.DefaultConfig.loader;
 
   return class NativeProxyLoader extends DefaultLoader {
@@ -182,9 +183,9 @@ function createNativeProxyLoader(debugFn?: (msg: string) => void) {
       let cdnUrl: string = context.url;
 
       // ── Step 1: un-wrap an already-proxied URL to recover the real CDN URL ──
-      if (cdnUrl.startsWith(CLOUD_PROXY)) {
+      if (cdnUrl.startsWith(activeProxyUrl)) {
         try {
-          cdnUrl = decodeURIComponent(cdnUrl.slice(CLOUD_PROXY.length));
+          cdnUrl = decodeURIComponent(cdnUrl.slice(activeProxyUrl.length));
           debugFn?.(`🔓 Unwrapped proxy → ${cdnUrl.substring(0, 90)}`);
         } catch { /* keep original */ }
       }
@@ -197,7 +198,7 @@ function createNativeProxyLoader(debugFn?: (msg: string) => void) {
       // the manifest to absolute origin URLs, so they reach here without the
       // CLOUD_PROXY prefix and should be fetched directly.
       if (needsCloudProxy(cdnUrl) && !isSegmentUrl(cdnUrl)) {
-        context.url = CLOUD_PROXY + encodeURIComponent(cdnUrl);
+        context.url = activeProxyUrl + encodeURIComponent(cdnUrl);
         debugFn?.(`📡 Proxy load: ${cdnUrl.substring(0, 70)}`);
       }
 
@@ -312,6 +313,7 @@ export default function Player({
   onToggleFavorite,
   onPlayChannel,
   onBack,
+  customProxyUrl,
 }: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);        // mobile <video>
   const desktopVideoRef = useRef<HTMLVideoElement>(null);  // desktop <video>
@@ -324,9 +326,16 @@ export default function Player({
   const [resolving, setResolving] = useState(false);
   const [nativeFallback, setNativeFallback] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
+  const activeProxyUrl = customProxyUrl || CLOUD_PROXY;
   const [showDebug, setShowDebug] = useState(false);
   const [reportCopied, setReportCopied] = useState(false);
   const MAX_RETRIES = 2;
+
+  /* ── Refs for stable callbacks in effect ── */
+  const skipLogicRef = useRef({ sidebarChannels, onPlayChannel, channel });
+  useEffect(() => {
+    skipLogicRef.current = { sidebarChannels, onPlayChannel, channel };
+  }, [sidebarChannels, onPlayChannel, channel]);
 
   /* ── Live clock for sidebar header (updates every 30 s) ── */
   const [currentTime, setCurrentTime] = useState(() =>
@@ -474,7 +483,7 @@ export default function Player({
     resolveStream(channel.streamUrl)
       .then((url) => {
         if (!cancelled) {
-          const rewritten = proxyRewrite(url);
+          const rewritten = proxyRewrite(url, activeProxyUrl);
           addDebugLine(`✅ Resolved → ${url.substring(0, 80)}…`);
           if (rewritten !== url) addDebugLine(`🔄 Proxy rewrite → ${rewritten.substring(0, 80)}…`);
           setResolvedUrl(rewritten);
@@ -484,7 +493,7 @@ export default function Player({
       .catch((err) => {
         if (!cancelled) {
           addDebugLine(`⚠️ Resolve failed: ${err.message} — using original`);
-          const rewritten = proxyRewrite(channel.streamUrl!);
+          const rewritten = proxyRewrite(channel.streamUrl!, activeProxyUrl);
           setResolvedUrl(rewritten);
           setResolving(false);
         }
@@ -580,9 +589,24 @@ export default function Player({
         setNativeFallback(true);
         setStatus("loading");
       } else {
-        setErrorTitle(title);
-        setErrorMsg(msg);
-        setStatus("error");
+        // Auto-skip logic
+        const { sidebarChannels: sc, onPlayChannel: opc, channel: currentCh } = skipLogicRef.current;
+        let skipped = false;
+        if (sc && opc) {
+          const idx = sc.findIndex(c => c.id === currentCh.id);
+          if (idx !== -1 && idx + 1 < sc.length) {
+            console.log(`[Player] Auto-skipping dead stream to next channel: ${sc[idx+1].name}`);
+            addDebugLine(`⏭️ Auto-skipping to ${sc[idx+1].name}`);
+            opc(sc[idx+1]);
+            skipped = true;
+          }
+        }
+
+        if (!skipped) {
+          setErrorTitle(title);
+          setErrorMsg(msg);
+          setStatus("error");
+        }
       }
     };
 
@@ -610,7 +634,7 @@ export default function Player({
          * the CDN origin, not the Cloudflare Worker domain.
          */
         ...(IS_NATIVE
-          ? { loader: createNativeProxyLoader(addDebugLine) as any }
+          ? { loader: createNativeProxyLoader(activeProxyUrl, addDebugLine) as any }
           : {}),
 
         xhrSetup: (xhr, url) => {

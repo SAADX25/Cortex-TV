@@ -8,6 +8,8 @@ export interface GlobeSettings {
   globeFps: GlobeFps;          // "auto" | 30 | 60 (default "auto")
   devMonitorVisible?: boolean; // Show Dev Monitor overlay
   autoRotate: boolean;         // Enable/disable globe auto-rotation
+  highQualityGraphics: boolean;// Use native resolution
+  customProxyUrl?: string;     // Custom CORS proxy URL for web
 }
 
 export interface PlaylistConfig {
@@ -239,6 +241,15 @@ export default function SettingsPanel({
               <div className="w-full border-t border-white/[0.04] my-1" />
 
               <ToggleRow
+                label="High Quality Graphics"
+                description="Use native resolution for sharper globe (may consume more battery)"
+                checked={!!settings.highQualityGraphics}
+                onChange={(on) => update({ highQualityGraphics: on })}
+              />
+
+              <div className="w-full border-t border-white/[0.04] my-1" />
+
+              <ToggleRow
                 label="Atmospheric Glow"
                 description="Enable outer atmosphere glow effect"
                 checked={glowEnabled}
@@ -273,10 +284,28 @@ export default function SettingsPanel({
                   />
                 </>
               )}
+
+              <div className="w-full border-t border-white/[0.04] my-1" />
+
+              <div className="flex flex-col gap-2 py-2 px-1">
+                <div className="flex flex-col">
+                  <span className="text-white text-base sm:text-sm font-medium">Custom CORS Proxy</span>
+                  <span className="text-white/50 text-xs sm:text-[11px] leading-relaxed mt-1">
+                    Enter a proxy URL (e.g., https://corsproxy.io/?) if streams fail to load.
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  placeholder="https://corsproxy.io/?"
+                  value={settings.customProxyUrl || ""}
+                  onChange={(e) => update({ customProxyUrl: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-md px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-cyan-500/50 focus:bg-white/10 transition-colors"
+                />
+              </div>
             </div>
           </section>
 
-          {/* â•â• Playlist Configuration Card â•â• */}
+          {/* ══ Playlist Configuration Card ══ */}
           <section>
             <h3 className="text-xs font-bold text-cyan-500 uppercase tracking-widest mb-3 ml-2">
               Playlist Configuration
