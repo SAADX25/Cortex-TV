@@ -228,6 +228,9 @@ function GlobeInner({
   /* ------ Language toggle state ------ */
   const [uiLang, setUiLang] = useState<"en" | "ar">("en");
 
+  const renderRequestedRef = useRef(false);
+  const animationEndTimeRef = useRef(performance.now() + 2000);
+
   /* ------ Three.js Raycaster (reused across frames) ------ */
   const raycasterRef = useRef(new THREE.Raycaster());
   const centerNDC = useRef(new THREE.Vector2(0, 0));
@@ -285,8 +288,6 @@ function GlobeInner({
     if (!globe) return;
 
     const controls = globe.controls();
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = rotationSpeed;
     controls.enablePan = false;
     controls.minDistance = 150;
     controls.maxDistance = 500;
@@ -349,6 +350,7 @@ function GlobeInner({
     const globe = globeRef.current;
     if (!globe) return;
     const controls = globe.controls();
+    controls.autoRotate = autoRotate && !paused;
     controls.autoRotateSpeed = (paused || !autoRotate) ? 0 : rotationSpeed;
   }, [rotationSpeed, autoRotate, paused]);
 
@@ -390,23 +392,38 @@ function GlobeInner({
     };
     const frameMs = computeFrameMs();
 
+    const ctrl = globe.controls?.();
+    const requestRender = () => { renderRequestedRef.current = true; };
+    if (ctrl) {
+      ctrl.addEventListener("change", requestRender);
+    }
+
     if (paused) {
       renderer.setAnimationLoop(null);
     } else {
       renderer.setAnimationLoop((time: number = performance.now()) => {
         if (time - lastFrame < frameMs) return;
-        lastFrame = time;
-        const ctrl = globe.controls?.();
+
         if (ctrl) ctrl.update();
-        renderer.render(globe.scene(), globe.camera());
+
+        const isAutoRotating = autoRotate && !paused && rotationSpeed > 0;
+        const isAnimating = time < animationEndTimeRef.current;
+        const shouldRender = renderRequestedRef.current || isAnimating || isAutoRotating;
+
+        if (shouldRender) {
+          lastFrame = time;
+          renderRequestedRef.current = false;
+          renderer.render(globe.scene(), globe.camera());
+        }
       });
     }
 
     /* Cleanup: ensure the loop is stopped if the component unmounts while running */
     return () => {
+      if (ctrl) ctrl.removeEventListener("change", requestRender);
       renderer.setAnimationLoop(null);
     };
-  }, [paused, highQualityGraphics, globeFps]);
+  }, [paused, highQualityGraphics, globeFps, autoRotate, rotationSpeed]);
 
   /* ------ Fly to country when focusCountryIso changes ------ */
   useEffect(() => {
@@ -442,7 +459,17 @@ function GlobeInner({
       { lat: lats / count, lng: lngs / count, altitude: 1.8 },
       1200
     );
+    animationEndTimeRef.current = performance.now() + 1250;
   }, [focusCountryIso, countries]);
+
+  /* ------ Render Triggers for transitions ------ */
+  useEffect(() => {
+    animationEndTimeRef.current = performance.now() + 1000;
+  }, [countries]);
+
+  useEffect(() => {
+    animationEndTimeRef.current = performance.now() + 350;
+  }, [selectedCountryIso]);
 
   /* ------ Helper: extract name + iso from a GeoJSON feature ------ */
   const extractCountryInfo = useCallback((feature: any) => {

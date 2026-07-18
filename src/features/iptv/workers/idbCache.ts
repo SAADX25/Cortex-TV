@@ -1,22 +1,22 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   idbCache.ts â€“ Tiny raw IndexedDB wrapper for SWR
+﻿/* ──────────────────────────────────────────────────
+   idbCache.ts – Tiny raw IndexedDB wrapper for SWR
    caching of IPTV JSON payloads.
 
    Zero dependencies. Three exports:
-     idbGet(key)  â†’ { data, hash, ts } | null
+     idbGet(key)  → { data, hash, ts } | null
      idbSet(key, data, hash)
-     fingerprint(arr)  â†’ string   (fast equality hash)
+     fingerprint(arr)  → string   (fast equality hash)
 
    DB name : "cortex_cache"
    Store   : "json"
    Keys    : "channels" | "streams"
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ────────────────────────────────────────────────── */
 
 const DB_NAME = "cortex_cache";
 const DB_VERSION = 1;
 const STORE = "json";
 
-/* â”€â”€ Singleton DB connection â”€â”€ */
+/* ── Singleton DB connection ── */
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -43,7 +43,7 @@ function openDB(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
-/* â”€â”€ Cached entry shape â”€â”€ */
+/* ── Cached entry shape ── */
 
 export interface CacheEntry {
   data: any[];
@@ -51,7 +51,7 @@ export interface CacheEntry {
   ts: number; // Date.now() at write time
 }
 
-/* â”€â”€ Public API â”€â”€ */
+/* ── Public API ── */
 
 export async function idbGet(key: string): Promise<CacheEntry | null> {
   try {

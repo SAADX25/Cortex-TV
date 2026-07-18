@@ -323,7 +323,7 @@ export default function SettingsPanel({
 
               <div className="w-full border-t border-white/[0.04] my-1" />
 
-              {/* â”€â”€ Auth method segmented control â”€â”€ */}
+              {/* ── Auth method segmented control ── */}
               <div className="py-3">
                 <div className="flex items-center h-11 rounded-xl bg-white/[0.04] p-1 gap-0.5">
                   <button
@@ -349,7 +349,7 @@ export default function SettingsPanel({
                 </div>
               </div>
 
-              {/* â”€â”€ Direct M3U input â”€â”€ */}
+              {/* ── Direct M3U input ── */}
               {authMode === "m3u" && (
                 <>
                   <div className="py-2 space-y-2.5">
@@ -402,7 +402,7 @@ export default function SettingsPanel({
                 </>
               )}
 
-              {/* â”€â”€ Xtream Codes login form â”€â”€ */}
+              {/* ── Xtream Codes login form ── */}
               {authMode === "xtream" && (
                 <div className="py-2 space-y-3">
                   {/* Server */}
@@ -620,7 +620,7 @@ export default function SettingsPanel({
   );
 }
 
-/* â”€â”€ Info row helper â”€â”€ */
+/* ── Info row helper ── */
 function InfoRow({
   label,
   value,

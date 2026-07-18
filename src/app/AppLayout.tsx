@@ -332,7 +332,8 @@ export default function AppLayout() {
           selectedCountryIso={selectedCountry?.iso ?? null}
           globeFps={globeSettings.globeFps}
           paused={!sceneVisible}
-          autoRotate={globeSettings.autoRotate}
+          autoRotate={globeSettings.autoRotate}
+          highQualityGraphics={globeSettings.highQualityGraphics}
         />
       </div>
 

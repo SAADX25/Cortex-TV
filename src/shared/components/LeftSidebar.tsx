@@ -158,7 +158,7 @@ export default function LeftSidebar({
 }: LeftSidebarProps) {
   return (
     <>
-      {/* â”€â”€ Collapse toggle button â”€â”€ */}
+      {/* ── Collapse toggle button ── */}
       <button
         type="button"
         onClick={onToggleCollapsed}
@@ -169,7 +169,7 @@ export default function LeftSidebar({
         <PanelToggleIcon open={!collapsed} />
       </button>
 
-      {/* â”€â”€ Sidebar panel â”€â”€ */}
+      {/* ── Sidebar panel ── */}
       <aside
         className={`cortex-hud-panel absolute bottom-0 left-0 top-0 z-50 hidden w-56 flex-col overflow-hidden rounded-r-2xl transition-transform duration-300 ease-out md:flex ${
           collapsed ? "-translate-x-[14rem]" : "translate-x-0"

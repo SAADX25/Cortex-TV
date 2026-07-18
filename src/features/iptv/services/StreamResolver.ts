@@ -1,10 +1,10 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   StreamResolver.ts â€“ Educational mock stream resolver
+﻿/* ──────────────────────────────────────────────────
+   StreamResolver.ts – Educational mock stream resolver
    Demonstrates how token-based DRM resolution works
    for IPTV streams. Intercepts URLs that require
    authentication / temporary tokens and resolves them
    into playable .m3u8 links.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ────────────────────────────────────────────────── */
 
 /** Domains / schemes that signal the URL needs resolving */
 const RESOLVE_SCHEME = "resolve://";
@@ -19,7 +19,7 @@ const RESOLVE_DOMAINS = [
  * In production this would hit a real auth endpoint.
  */
 async function fetchPlaybackToken(host: string): Promise<string> {
-  /* Simulate network latency (400 â€“ 900 ms) */
+  /* Simulate network latency (400 – 900 ms) */
   const latency = 400 + Math.random() * 500;
   await new Promise((r) => setTimeout(r, latency));
 
@@ -55,7 +55,7 @@ function needsResolving(url: string): boolean {
  *   token and returns a fully-qualified `.m3u8` URL.
  * - Otherwise the original URL is returned untouched.
  *
- * @param originalUrl â€“ The raw stream URL from the channel data.
+ * @param originalUrl – The raw stream URL from the channel data.
  * @returns A playable stream URL (possibly with an appended token).
  */
 export const resolveStream = async (
@@ -87,6 +87,6 @@ export const resolveStream = async (
   const separator = targetUrl.includes("?") ? "&" : "?";
   const resolvedUrl = `${targetUrl}${separator}token=${token}`;
 
-  console.log("[StreamResolver] Resolved â†’", resolvedUrl);
+  console.log("[StreamResolver] Resolved →", resolvedUrl);
   return resolvedUrl;
 };

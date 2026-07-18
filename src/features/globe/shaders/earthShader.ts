@@ -1,10 +1,10 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+﻿/* ─────────────────────────────────────────────────
    Earth Day / Night custom ShaderMaterial
-   â€“ Blends day texture & night (city-lights)
+   – Blends day texture & night (city-lights)
      emissive texture based on sunlight angle.
-   â€“ Includes specular highlights on oceans and
+   – Includes specular highlights on oceans and
      a smooth, wide terminator band.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────── */
 
 export const earthVertexShader = /* glsl */ `
   varying vec2 vUv;
@@ -19,7 +19,7 @@ export const earthVertexShader = /* glsl */ `
     vec4 worldPos  = modelMatrix * vec4(position, 1.0);
     vWorldPosition = worldPos.xyz;
 
-    // View direction (camera â†’ fragment)
+    // View direction (camera → fragment)
     vViewDirection = normalize(cameraPosition - worldPos.xyz);
 
     gl_Position = projectionMatrix * viewMatrix * worldPos;
@@ -43,27 +43,27 @@ export const earthFragmentShader = /* glsl */ `
     vec3 V   = normalize(vViewDirection);
     vec3 H   = normalize(L + V);        // half-vector for specular
 
-    // â”€â”€ Diffuse sun illumination â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Diffuse sun illumination ──────────────────────────
     float NdotL = dot(N, L);
 
     // Wide soft terminator (-0.2 â€¦ +0.35)
     float dayBlend = smoothstep(-0.2, 0.35, NdotL);
 
-    // â”€â”€ Texture samples â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Texture samples ──────────────────────────────────
     vec4 dayTex   = texture2D(uDayMap,   vUv);
     vec4 nightTex = texture2D(uNightMap, vUv);
 
     // Day-lit colour with gentle ambient fill
     vec3 litDay = dayTex.rgb * (0.06 + 0.94 * max(NdotL, 0.0));
 
-    // â”€â”€ Specular highlight (ocean glint) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Specular highlight (ocean glint) ─────────────────
     float spec = pow(max(dot(N, H), 0.0), 48.0) * 0.35;
     litDay += vec3(spec);
 
-    // â”€â”€ Night city-lights (emissive glow) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Night city-lights (emissive glow) ────────────────
     vec3 litNight = nightTex.rgb * 1.5;
 
-    // â”€â”€ Blend day / night â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ── Blend day / night ────────────────────────────────
     vec3 color = mix(litNight, litDay, dayBlend);
 
     gl_FragColor = vec4(color, 1.0);

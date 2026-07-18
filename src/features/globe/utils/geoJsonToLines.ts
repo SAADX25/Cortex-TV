@@ -1,18 +1,18 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+﻿/* ─────────────────────────────────────────────────────────
    geoJsonToLines.ts
-   Convert GeoJSON country-border polygons â†’ Float32Array
+   Convert GeoJSON country-border polygons → Float32Array
    of line-segment vertex pairs on a sphere of given radius.
 
    Also exports per-country polygon arrays for raycasting.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────────────── */
 
 import * as THREE from "three";
 
-/** Degrees â†’ radians */
+/** Degrees → radians */
 const DEG2RAD = Math.PI / 180;
 
 /**
- * Convert [longitude, latitude] â†’ THREE.Vector3 on a unit sphere.
+ * Convert [longitude, latitude] → THREE.Vector3 on a unit sphere.
  */
 export function latLonToVec3(
   lon: number,
@@ -42,7 +42,7 @@ export function vec3ToLatLon(v: THREE.Vector3): { lat: number; lon: number } {
   };
 }
 
-/* â”€â”€ Aggregated line-segment geometry â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Aggregated line-segment geometry ──────────────────── */
 
 export function geoJsonToLineSegments(
   geoJson: GeoJSON.FeatureCollection,
@@ -76,7 +76,7 @@ export function geoJsonToLineSegments(
   return new Float32Array(verts);
 }
 
-/* â”€â”€ Per-country data for raycasting / hit-testing â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Per-country data for raycasting / hit-testing ─────── */
 
 export interface CountryPolygon {
   /** Country name from properties (NAME, ADMIN, or name) */

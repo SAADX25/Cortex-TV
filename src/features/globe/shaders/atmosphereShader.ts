@@ -1,9 +1,9 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+﻿/* ─────────────────────────────────────────────────
    Atmospheric Fresnel glow shader
-   â€“ Additive-blend halo around the globe edges.
-   â€“ Sun-aware: glow is brighter on the sun-lit limb,
+   – Additive-blend halo around the globe edges.
+   – Sun-aware: glow is brighter on the sun-lit limb,
      dimmer on the dark side for realism.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ───────────────────────────────────────────────── */
 
 export const atmosphereVertexShader = /* glsl */ `
   varying vec3 vNormal;

@@ -335,11 +335,11 @@ export default function HomeExperience({
 
   return (
     <>
-      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      {/* ─────────────────────────────────────────────────────────────────
           Desktop: Right country panel â€” fixed inside the globe overlay
-      â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      ───────────────────────────────────────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0 z-30 hidden md:block">
-        {/* â”€â”€ Country Browser Toggle â”€â”€ */}
+        {/* ── Country Browser Toggle ── */}
         <button
           type="button"
           onClick={() => setCountryBrowserOpen((v) => !v)}
@@ -366,7 +366,7 @@ export default function HomeExperience({
 
         <aside className={`cortex-hud-panel pointer-events-auto absolute bottom-0 right-0 top-0 flex w-[300px] xl:w-[336px] flex-col overflow-hidden rounded-l-2xl transition-transform duration-300 ${countryBrowserOpen ? "translate-x-0" : "translate-x-full"}`}>
 
-          {/* â”€â”€ Sticky header (does NOT scroll) â”€â”€ */}
+          {/* ── Sticky header (does NOT scroll) ── */}
           <div className="shrink-0 px-4 pt-4 pb-0">
             <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-cyan-300/48">
               Country Browser
@@ -413,7 +413,7 @@ export default function HomeExperience({
             <div className="h-px bg-gradient-to-r from-transparent via-cyan-300/10 to-transparent" />
           </div>
 
-          {/* â”€â”€ Scrollable country list â”€â”€ KEY FIX â”€â”€ */}
+          {/* ── Scrollable country list ── KEY FIX ── */}
           <div
             className="no-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2"
             style={{ WebkitOverflowScrolling: "touch" }}
@@ -430,9 +430,9 @@ export default function HomeExperience({
         </aside>
       </div>
 
-      {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      {/* ─────────────────────────────────────────────────────────────────
           Mobile: Bottom sheet (countries / categories / about)
-      â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+      ───────────────────────────────────────────────────────────────── */}
       {sheet && (
         <div className="fixed inset-0 z-[9200] bg-black/55 backdrop-blur-[2px] md:hidden" onClick={() => setSheet(null)}>
           <div
