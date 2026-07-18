@@ -214,6 +214,11 @@ function GlobeInner({
   });
   const [loading, setLoading] = useState(true);
 
+  const rendererConfig = useMemo(() => ({
+    antialias: highQualityGraphics,
+    alpha: true,
+    powerPreference: (highQualityGraphics ? "high-performance" : "low-power") as WebGLPowerPreference,
+  }), [highQualityGraphics]);
   /* ------ Sniper-mode state ------ */
   const pointerDownRef = useRef<{ x: number; y: number; time: number } | null>(
     null
@@ -372,6 +377,8 @@ function GlobeInner({
         ? Math.min(window.devicePixelRatio || 1, 0.75) // Lower resolution for Auto to save GPU
         : Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO);
     renderer.setPixelRatio(targetPixelRatio);
+    const currentSize = renderer.getSize(new THREE.Vector2());
+    renderer.setSize(currentSize.width, currentSize.height, false);
     
     // Export renderer stats for DebugPanel
     if (import.meta.env.DEV) {
@@ -904,7 +911,7 @@ function GlobeInner({
         ref={globeRef}
         width={dimensions.width}
         height={dimensions.height}
-        rendererConfig={GLOBE_RENDERER_CONFIG}
+        rendererConfig={rendererConfig}
         /* ------ Textures ------ */
         globeImageUrl={isNightMode ? GLOBE_NIGHT_URL : GLOBE_DAY_URL}
         bumpImageUrl={undefined}
