@@ -289,7 +289,8 @@ export default function AppLayout() {
     activeTab === "news";
 
   /* ---- Handle settings toggle ---- */
-  const sceneVisible = activeTab === 'globe' && !selectedCountry && !isPlaylistMode && !playingChannel;
+  // Globe stays visible when a country is selected; hides only when a video is playing (GPU savings)
+  const sceneVisible = activeTab === 'globe' && !isPlaylistMode && !playingChannel;
   const showHomeExperience = activeTab === 'globe' && !selectedCountry && !isPlaylistMode && !playingChannel;
 
   /* ---- Render ---- */
@@ -328,11 +329,25 @@ export default function AppLayout() {
           rotationSpeed={globeSettings.rotationSpeed}
           atmosphereIntensity={globeSettings.atmosphereIntensity}
           focusCountryIso={focusCountryIso}
+          selectedCountryIso={selectedCountry?.iso ?? null}
           globeFps={globeSettings.globeFps}
           paused={!sceneVisible}
           autoRotate={globeSettings.autoRotate}
         />
       </div>
+
+      {/* Clickable backdrop to close active panels when clicking on the globe/middle area */}
+      {!playingChannel && (activeTab !== 'globe' || selectedCountry || isPlaylistMode) && (
+        <div 
+          className="absolute inset-0 z-10 cursor-pointer"
+          onClick={() => {
+            if (activeTab !== 'globe') setActiveTab('globe');
+            if (selectedCountry) selectCountry(null);
+            if (isPlaylistMode && activeTab === 'globe') setPlaylistConfig((p) => ({ ...p, enabled: false }));
+          }}
+          aria-label="Return to globe"
+        />
+      )}
 
       {showHomeExperience && (
         <HomeExperience
@@ -408,15 +423,6 @@ export default function AppLayout() {
               </p>
               <p className="mt-0.5 text-base md:text-lg font-semibold text-white">
                 {playlistChannels.length} Channels
-              </p>
-            </div>
-          ) : selectedCountry && !playingChannel ? (
-            <div className="rounded-lg border border-cyan-500/20 bg-black/40 px-4 md:px-5 py-2.5 md:py-3 backdrop-blur-sm">
-              <p className="text-[10px] font-medium uppercase tracking-widest text-cyan-400/70">
-                Selected Region
-              </p>
-              <p className="mt-0.5 text-base md:text-lg font-semibold text-white">
-                {selectedCountry.name}
               </p>
             </div>
           ) : null}
@@ -553,6 +559,7 @@ export default function AppLayout() {
           loading={false}
           error={null}
           onPlayChannel={playChannel}
+          onClose={() => navigateTo("globe")}
           favorites={favorites}
           onToggleFavorite={toggleFavorite}
           isPlaying={false}

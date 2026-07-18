@@ -1,7 +1,7 @@
-﻿/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Crosshair.tsx â€“ High-precision neon blue dot
+﻿/* ------------------------------------------------------------------------------------------------------------------------------------------
+   Crosshair.tsx --- High-precision neon blue dot
    for country targeting on the Globe.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ------------------------------------------------------------------------------------------------------------------------------------------ */
 
 import { memo } from "react";
 
@@ -13,7 +13,7 @@ interface CrosshairProps {
 function CrosshairInner({ active = false }: CrosshairProps) {
   return (
     <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center hidden [@media(pointer:coarse)]:flex [will-change:transform]">
-      {/* â”€â”€ Neon blue precision dot â”€â”€ */}
+      {/* ------ Neon blue precision dot ------ */}
       <div
         className={`rounded-full transition-transform duration-150 ${
           active ? "scale-[1.8]" : "scale-100"

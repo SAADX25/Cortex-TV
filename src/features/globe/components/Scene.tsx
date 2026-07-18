@@ -1,7 +1,7 @@
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Scene.tsx â€“ Wraps the react-globe.gl Globe
+﻿/* ------------------------------------------------------------------------------------------------------------------------------------------------------
+   Scene.tsx --- Wraps the react-globe.gl Globe
    and forwards country-click events to the parent.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ------------------------------------------------------------------------------------------------------------------------------------------------------ */
 
 import { useCallback } from "react";
 import Globe, { type GlobeClickInfo, type GlobeFps } from "./Globe";
@@ -12,6 +12,7 @@ interface SceneProps {
   rotationSpeed?: number;
   atmosphereIntensity?: number;
   focusCountryIso?: string | null;
+  selectedCountryIso?: string | null;
   globeFps?: GlobeFps;
   paused?: boolean;
   autoRotate?: boolean;
@@ -23,6 +24,7 @@ export default function Scene({
   rotationSpeed,
   atmosphereIntensity,
   focusCountryIso,
+  selectedCountryIso,
   globeFps,
   paused,
   autoRotate,
@@ -47,6 +49,7 @@ export default function Scene({
       rotationSpeed={rotationSpeed}
       atmosphereIntensity={atmosphereIntensity}
       focusCountryIso={focusCountryIso}
+      selectedCountryIso={selectedCountryIso}
       globeFps={globeFps}
       paused={paused}
       autoRotate={autoRotate}

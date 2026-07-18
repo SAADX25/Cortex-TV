@@ -1,7 +1,7 @@
-/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-   Globe.tsx â€“ Interactive 3D Globe using react-globe.gl
+﻿/* ------------------------------------------------------------------------------------------------------------------------------------------
+   Globe.tsx --- Interactive 3D Globe using react-globe.gl
    Neon-styled country polygons with CDN textures.
-   â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+   ------------------------------------------------------------------------------------------------------------------------------------------ */
 
 import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import GlobeGL from "react-globe.gl";
@@ -9,7 +9,7 @@ import * as THREE from "three";
 import Crosshair from "./Crosshair";
 import { flagUrl } from "@/shared/lib/channelUtils";
 
-/* â”€â”€ GeoJSON point-in-polygon (ray-casting) â”€â”€ */
+/* ------ GeoJSON point-in-polygon (ray-casting) ------ */
 function pointInRing2D(
   testLng: number,
   testLat: number,
@@ -31,7 +31,7 @@ function pointInRing2D(
 function polygonContainsPoint(rings: number[][][], lng: number, lat: number): boolean {
   // Must be inside the outer ring
   if (!pointInRing2D(lng, lat, rings[0])) return false;
-  // Must NOT be inside any hole (rings[1], rings[2], â€¦)
+  // Must NOT be inside any hole (rings[1], rings[2], ---)
   for (let i = 1; i < rings.length; i++) {
     if (pointInRing2D(lng, lat, rings[i])) return false;
   }
@@ -57,7 +57,7 @@ function geoContainsPoint(
   return false;
 }
 
-/* â”€â”€ ISO-A2 â†’ primary IANA timezone map â”€â”€ */
+/* ------ ISO-A2 --- primary IANA timezone map ------ */
 const COUNTRY_TZ: Record<string, string> = {
   AF:"Asia/Kabul",AL:"Europe/Tirane",DZ:"Africa/Algiers",AD:"Europe/Andorra",
   AO:"Africa/Luanda",AG:"America/Antigua",AR:"America/Argentina/Buenos_Aires",
@@ -109,7 +109,7 @@ const COUNTRY_TZ: Record<string, string> = {
   PS:"Asia/Hebron",XK:"Europe/Belgrade",EH:"Africa/El_Aaiun",
 };
 
-/* â”€â”€ ISO-A2 â†’ Capital city name â”€â”€ */
+/* ------ ISO-A2 --- Capital city name ------ */
 const COUNTRY_CAPITAL: Record<string, string> = {
   AF:"Kabul",AL:"Tirana",DZ:"Algiers",AD:"Andorra la Vella",AO:"Luanda",
   AG:"St. John's",AR:"Buenos Aires",AM:"Yerevan",AU:"Canberra",AT:"Vienna",
@@ -151,7 +151,7 @@ const COUNTRY_CAPITAL: Record<string, string> = {
   EH:"Laayoune",
 };
 
-/* â”€â”€ ISO-A3 / ADM0_A3 â†’ ISO-A2  (comprehensive, covers all Natural Earth entries) â”€â”€ */
+/* ------ ISO-A3 / ADM0_A3 --- ISO-A2  (comprehensive, covers all Natural Earth entries) ------ */
 const A3_TO_A2: Record<string, string> = {
   AFG:"AF",ALB:"AL",DZA:"DZ",AND:"AD",AGO:"AO",ATG:"AG",ARG:"AR",ARM:"AM",
   AUS:"AU",AUT:"AT",AZE:"AZ",BHS:"BS",BHR:"BH",BGD:"BD",BRB:"BB",BLR:"BY",
@@ -178,9 +178,9 @@ const A3_TO_A2: Record<string, string> = {
   VUT:"VU",VEN:"VE",VNM:"VN",YEM:"YE",ZMB:"ZM",ZWE:"ZW",PSE:"PS",ESH:"EH",
   /* Natural Earth special ADM0_A3 codes */
   KOS:"XK",  /* Kosovo */
-  SOL:"SO",  /* Somaliland â†’ Somalia fallback */
-  CYN:"CY",  /* Northern Cyprus â†’ Cyprus */
-  KAS:"IN",  /* Kashmir â†’ India */
+  SOL:"SO",  /* Somaliland --- Somalia fallback */
+  CYN:"CY",  /* Northern Cyprus --- Cyprus */
+  KAS:"IN",  /* Kashmir --- India */
   SAH:"EH",  /* Western Sahara */
   SDS:"SS",  /* South Sudan (alternate) */
   NRU:"NR",WSM:"WS",FSM:"FM",PLW:"PW",MHL:"MH",TUV:"TV",
@@ -193,7 +193,7 @@ const A3_TO_A2: Record<string, string> = {
   ATF:"TF",  /* French Southern Territories */
   SPM:"PM",  /* Saint Pierre and Miquelon */
   WLF:"WF",  /* Wallis and Futuna */
-  REU:"RE",  /* RÃ©union */
+  REU:"RE",  /* R--union */
   MYT:"YT",  /* Mayotte */
   MTQ:"MQ",  /* Martinique */
   GLP:"GP",  /* Guadeloupe */
@@ -209,7 +209,7 @@ const A3_TO_A2: Record<string, string> = {
   TKL:"TK",NIU:"NU",COK:"CK",MAC:"MO",HKG:"HK",
 };
 
-/* â”€â”€ ADMIN name â†’ ISO-A2 (fallback for entries with no valid codes) â”€â”€ */
+/* ------ ADMIN name --- ISO-A2 (fallback for entries with no valid codes) ------ */
 const ADMIN_TO_A2: Record<string, string> = {
   "france":"FR","norway":"NO","northern cyprus":"CY","kosovo":"XK",
   "somaliland":"SO","western sahara":"EH","united states of america":"US",
@@ -234,7 +234,7 @@ const ADMIN_TO_A2: Record<string, string> = {
 
 /**
  * Resolve any code/name from GeoJSON properties to a valid ISO-A2 code.
- * Tries: direct 2-letter, A3â†’A2 lookup, ADM0_A3â†’A2 lookup, ADMIN name lookup.
+ * Tries: direct 2-letter, A3---A2 lookup, ADM0_A3---A2 lookup, ADMIN name lookup.
  * Returns empty string if nothing matches.
  */
 function resolveIsoA2(props: Record<string, any>): string {
@@ -245,16 +245,16 @@ function resolveIsoA2(props: Record<string, any>): string {
   // 1) Direct ISO_A2
   const a2 = clean(props.ISO_A2);
   if (a2.length === 2) return a2.toUpperCase();
-  // 2) ISO_A3 â†’ lookup
+  // 2) ISO_A3 --- lookup
   const a3 = clean(props.ISO_A3);
   if (a3 && A3_TO_A2[a3.toUpperCase()]) return A3_TO_A2[a3.toUpperCase()];
-  // 3) ADM0_A3 â†’ lookup (different field, sometimes different value)
+  // 3) ADM0_A3 --- lookup (different field, sometimes different value)
   const adm = clean(props.ADM0_A3);
   if (adm && A3_TO_A2[adm.toUpperCase()]) return A3_TO_A2[adm.toUpperCase()];
   // 4) WB_A2 / FIPS_10_ (some NE versions)
   const wb = clean(props.WB_A2);
   if (wb.length === 2) return wb.toUpperCase();
-  // 5) ADMIN name â†’ lookup
+  // 5) ADMIN name --- lookup
   const admin = (props.ADMIN || props.NAME || '').toLowerCase().trim();
   if (admin && ADMIN_TO_A2[admin]) return ADMIN_TO_A2[admin];
   return '';
@@ -307,7 +307,7 @@ const IS_TOUCH_DEVICE = typeof window !== 'undefined'
   && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
   && window.matchMedia('(pointer: coarse)').matches;
 
-/* â”€â”€ CDN asset URLs â”€â”€ */
+/* ------ CDN asset URLs ------ */
 const GLOBE_DAY_URL =
   "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg";
 const GLOBE_NIGHT_URL =
@@ -335,7 +335,7 @@ const PREFERS_REDUCED_MOTION =
   typeof window !== "undefined" &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/* â”€â”€ Public types â”€â”€ */
+/* ------ Public types ------ */
 export interface CountryInfo {
   name: string;
   iso: string;
@@ -353,6 +353,8 @@ interface GlobeProps {
   rotationSpeed?: number;
   atmosphereIntensity?: number;
   focusCountryIso?: string | null;
+  /** ISO-A2 code of the currently selected country - highlighted in red */
+  selectedCountryIso?: string | null;
   /** Globe FPS cap: "auto" uses quality-based logic, 30 or 60 caps render loop */
   globeFps?: GlobeFps;
   /** Pause auto-rotation and heavy renders (search open, video playing) */
@@ -368,6 +370,7 @@ function GlobeInner({
   atmosphereIntensity = 0.25,
   globeFps = "auto",
   focusCountryIso,
+  selectedCountryIso,
   paused = false,
   autoRotate = false,
 }: GlobeProps) {
@@ -380,7 +383,7 @@ function GlobeInner({
   });
   const [loading, setLoading] = useState(true);
 
-  /* â”€â”€ Sniper-mode state â”€â”€ */
+  /* ------ Sniper-mode state ------ */
   const pointerDownRef = useRef<{ x: number; y: number; time: number } | null>(
     null
   );
@@ -391,15 +394,15 @@ function GlobeInner({
   } | null>(null);
   const [localTime, setLocalTime] = useState<string | null>(null);
 
-  /* â”€â”€ Language toggle state â”€â”€ */
+  /* ------ Language toggle state ------ */
   const [uiLang, setUiLang] = useState<"en" | "ar">("en");
 
-  /* â”€â”€ Three.js Raycaster (reused across frames) â”€â”€ */
+  /* ------ Three.js Raycaster (reused across frames) ------ */
   const raycasterRef = useRef(new THREE.Raycaster());
   const centerNDC = useRef(new THREE.Vector2(0, 0));
   const rafIdRef = useRef(0);
 
-  /* â”€â”€ Responsive resize â”€â”€ */
+  /* ------ Responsive resize ------ */
   useEffect(() => {
     const onResize = () =>
       setDimensions({ width: window.innerWidth, height: window.innerHeight });
@@ -407,7 +410,7 @@ function GlobeInner({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  /* â”€â”€ Fetch country polygons â”€â”€ */
+  /* ------ Fetch country polygons ------ */
   useEffect(() => {
     console.log("[Globe] Fetching country GeoJSON from CDNâ€¦");
     fetch(GEOJSON_URL)
@@ -428,7 +431,7 @@ function GlobeInner({
       });
   }, []);
 
-  /* â”€â”€ Globe scene tweaks (auto-rotate, etc.) â”€â”€ */
+  /* ------ Globe scene tweaks (auto-rotate, etc.) ------ */
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
@@ -500,9 +503,9 @@ function GlobeInner({
     controls.autoRotateSpeed = (paused || !autoRotate) ? 0 : rotationSpeed;
   }, [rotationSpeed, autoRotate, paused]);
 
-  /* â”€â”€ Freeze / resume the Three.js render loop (battery saver) â”€â”€
+  /* ------ Freeze / resume the Three.js render loop (battery saver) ------
      When paused, setAnimationLoop(null) cancels the internal rAF.
-     No frames rendered, no shaders execute â†’ 0% GPU while hidden.
+     No frames rendered, no shaders execute --- 0% GPU while hidden.
      On resume the existing WebGL context + textures are reused instantly. */
   useEffect(() => {
     const globe = globeRef.current;
@@ -554,7 +557,7 @@ function GlobeInner({
     };
   }, [paused]);
 
-  /* â”€â”€ Fly to country when focusCountryIso changes â”€â”€ */
+  /* ------ Fly to country when focusCountryIso changes ------ */
   useEffect(() => {
     if (!focusCountryIso || !globeRef.current || countries.length === 0) return;
     const iso = focusCountryIso.toUpperCase();
@@ -590,7 +593,7 @@ function GlobeInner({
     );
   }, [focusCountryIso, countries]);
 
-  /* â”€â”€ Helper: extract name + iso from a GeoJSON feature â”€â”€ */
+  /* ------ Helper: extract name + iso from a GeoJSON feature ------ */
   const extractCountryInfo = useCallback((feature: any) => {
     if (!feature) return null;
     const props = feature.properties ?? {};
@@ -603,7 +606,7 @@ function GlobeInner({
     return { name, iso };
   }, []);
 
-  /* â”€â”€ Bounding-box spatial index for fast geo rejection â”€â”€ */
+  /* ------ Bounding-box spatial index for fast geo rejection ------ */
   const countryBBoxes = useMemo(() => {
     return countries.map((f: any) => {
       let minLng = 180, maxLng = -180, minLat = 90, maxLat = -90;
@@ -618,7 +621,7 @@ function GlobeInner({
         }
       };
       if (f.geometry?.coordinates) walk(f.geometry.coordinates);
-      // If bbox spans > 180Â° in longitude it likely crosses the antimeridian;
+      // If bbox spans > 180-- in longitude it likely crosses the antimeridian;
       // expand to full range so the pre-filter never rejects it incorrectly.
       const wrapLng = maxLng - minLng > 180;
       return {
@@ -631,7 +634,7 @@ function GlobeInner({
     });
   }, [countries]);
 
-  /* â”€â”€ Analytical ray-sphere intersection â†’ lat/lng â”€â”€
+  /* ------ Analytical ray-sphere intersection --- lat/lng ------
      Casts a ray from screen center to the globe surface and returns
      the exact geographic coordinates of the intersection point.
      Accurate regardless of camera tilt, zoom, or orbit offset.
@@ -647,7 +650,7 @@ function GlobeInner({
     const { origin, direction } = raycasterRef.current.ray;
 
     /* Analytical ray-sphere intersection (sphere at origin, radius R).
-       Avoids scene traversal  â†’ zero GC pressure, runs at 60 fps. */
+       Avoids scene traversal  --- zero GC pressure, runs at 60 fps. */
     const a = direction.dot(direction);                      // always 1 for normalised dir
     const b = 2 * origin.dot(direction);
     const c = origin.dot(origin) - GLOBE_RADIUS * GLOBE_RADIUS;
@@ -664,11 +667,11 @@ function GlobeInner({
     if (r < 1) return null;                                  // degenerate
 
     /* three-globe convention:
-         polar2Cartesian  â†’  theta = (90 - lng) Â· Ï€/180
-                              x = rÂ·sin Ï†Â·cos Î¸,  z = rÂ·sin Ï†Â·sin Î¸
+         polar2Cartesian  ---  theta = (90 - lng) -- --/180
+                              x = r--sin ----cos --,  z = r--sin ----sin --
          Inverse:
-           lat = 90 - acos(y / r) Â· 180/Ï€
-           lng = 90 - atan2(z, x) Â· 180/Ï€           */
+           lat = 90 - acos(y / r) -- 180/--
+           lng = 90 - atan2(z, x) -- 180/--           */
     const lat = 90 - Math.acos(Math.max(-1, Math.min(1, py / r))) * (180 / Math.PI);
     let lng = 90 - Math.atan2(pz, px) * (180 / Math.PI);
     if (lng > 180) lng -= 360;
@@ -676,7 +679,7 @@ function GlobeInner({
     return { lat, lng };
   }, []);
 
-  /* â”€â”€ Fallback: raycaster â†’ polygon mesh __data at exact screen center â”€â”€ */
+  /* ------ Fallback: raycaster --- polygon mesh __data at exact screen center ------ */
   const getCenterCountry = useCallback((): any | null => {
     const globe = globeRef.current;
     if (!globe) return null;
@@ -694,7 +697,7 @@ function GlobeInner({
     });
     if (meshes.length === 0) return null;
 
-    /* Single ray at exact screen center â€“ no offsets to avoid adjacency errors */
+    /* Single ray at exact screen center --- no offsets to avoid adjacency errors */
     raycasterRef.current.setFromCamera(centerNDC.current, camera);
     const intersects = raycasterRef.current.intersectObjects(meshes, false);
     if (intersects.length > 0) {
@@ -704,7 +707,7 @@ function GlobeInner({
     return null;
   }, []);
 
-  /* â”€â”€ Primary: raycast to globe surface â†’ lat/lng â†’ PIP â”€â”€ */
+  /* ------ Primary: raycast to globe surface --- lat/lng --- PIP ------ */
   const getCenterCountryGeo = useCallback((): any | null => {
     if (countryBBoxes.length === 0) return null;
 
@@ -721,12 +724,12 @@ function GlobeInner({
     return null;
   }, [countryBBoxes, surfaceLatLngAtCenter]);
 
-  /* â”€â”€ Combined center lookup (geo-precise first, raycaster fallback) â”€â”€ */
+  /* ------ Combined center lookup (geo-precise first, raycaster fallback) ------ */
   const getCenterCountryCombined = useCallback((): any | null => {
     return getCenterCountryGeo() ?? getCenterCountry();
   }, [getCenterCountryGeo, getCenterCountry]);
 
-  /* â”€â”€ Select (confirm) the country at center â”€â”€ */
+  /* ------ Select (confirm) the country at center ------ */
   const selectFeature = useCallback(
     (feature: any) => {
       const info = extractCountryInfo(feature);
@@ -746,7 +749,7 @@ function GlobeInner({
     [onCountryClick, extractCountryInfo]
   );
 
-  /* â”€â”€ Sniper-mode: select whatever is under the crosshair â”€â”€ */
+  /* ------ Sniper-mode: select whatever is under the crosshair ------ */
   const selectCountryAtCenter = useCallback(() => {
     if (paused) return;
     const feature = getCenterCountryCombined();
@@ -760,7 +763,7 @@ function GlobeInner({
     }
   }, [paused, getCenterCountryCombined, selectFeature]);
 
-  /* â”€â”€ Live tracking via rAF loop (MOBILE only, 60fps-synced) â”€â”€ */
+  /* ------ Live tracking via rAF loop (MOBILE only, 60fps-synced) ------ */
   const updateTargetLabel = useCallback(() => {
     if (!IS_TOUCH_DEVICE) return;
     if (paused) { setTargetedCountry(null); setLocalTime(null); return; }
@@ -789,7 +792,7 @@ function GlobeInner({
     return () => { active = false; cancelAnimationFrame(rafIdRef.current); };
   }, [paused, updateTargetLabel]);
 
-  /* â”€â”€ Tick the live clock every second when a country is targeted â”€â”€ */
+  /* ------ Tick the live clock every second when a country is targeted ------ */
   useEffect(() => {
     if (!targetedCountry?.iso) { setLocalTime(null); return; }
     const tick = () => setLocalTime(getCountryTime(targetedCountry.iso));
@@ -798,10 +801,10 @@ function GlobeInner({
     return () => clearInterval(id);
   }, [targetedCountry?.iso]);
 
-  /* â”€â”€ Bulletproof event blocker for UI overlays â”€â”€ */
+  /* ------ Bulletproof event blocker for UI overlays ------ */
   const killEvent = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
 
-  /* â”€â”€ Pointer tracking: distinguish tap from drag â”€â”€ */
+  /* ------ Pointer tracking: distinguish tap from drag ------ */
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     /* Ignore taps on UI overlays (buttons, icons, etc.) */
     if ((e.target as HTMLElement).closest?.("button")) return;
@@ -839,7 +842,7 @@ function GlobeInner({
     [selectCountryAtCenter]
   );
 
-  /* â”€â”€ Direct mouse click on polygon (PC/Desktop) â”€â”€ */
+  /* ------ Direct mouse click on polygon (PC/Desktop) ------ */
   const handlePolygonClick = useCallback(
     (polygon: any, _event: MouseEvent, _coords: { lat: number; lng: number; altitude: number }) => {
       if (paused) return; // Allow interaction even in auto mode
@@ -848,7 +851,7 @@ function GlobeInner({
     [paused, selectFeature]
   );
 
-  /* â”€â”€ Desktop: mouse hover on polygon â†’ update badge â”€â”€ */
+  /* ------ Desktop: mouse hover on polygon --- update badge ------ */
   const handlePolygonHover = useCallback(
     (polygon: any) => {
       if (IS_TOUCH_DEVICE || paused) return;
@@ -872,7 +875,7 @@ function GlobeInner({
       onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
     >
-      {/* â”€â”€ Language toggle button (top-left, mirrors Dark-Mode on the right) â”€â”€ */}
+      {/* ------ Language toggle button (top-left, mirrors Dark-Mode on the right) ------ */}
       <button
         onTouchStart={killEvent}
         onTouchEnd={killEvent}
@@ -905,10 +908,10 @@ function GlobeInner({
         </span>
       </button>
 
-      {/* â”€â”€ Precision dot (neon blue) â”€â”€ */}
+      {/* ------ Precision dot (neon blue) ------ */}
       <Crosshair active={crosshairActive} />
 
-      {/* â”€â”€ Country Info Badge (iOS Glassmorphism) â”€â”€ */}
+      {/* ------ Country Info Badge (iOS Glassmorphism) ------ */}
       <div
         className={`fixed top-14 mobile-safe-badge-top left-1/2 -translate-x-1/2 z-50 pointer-events-none
                     transition-all duration-200 origin-top
@@ -936,7 +939,7 @@ function GlobeInner({
           const showDetails = !!(capital && time);
           return (
             <div className="flex flex-col items-center gap-1.5">
-              {/* â”€â”€ Top Row: Flag + Country Name â”€â”€ */}
+              {/* ------ Top Row: Flag + Country Name ------ */}
               <div className="flex items-center gap-2.5">
                 {hasIso ? (
                   <img
@@ -957,7 +960,7 @@ function GlobeInner({
                   {displayName}
                 </span>
               </div>
-              {/* â”€â”€ Bottom Row: Clock + Time + Capital (only if data exists) â”€â”€ */}
+              {/* ------ Bottom Row: Clock + Time + Capital (only if data exists) ------ */}
               {showDetails && (
                 <div className="flex items-center gap-1.5">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: '#94a3b8' }}>
@@ -973,7 +976,7 @@ function GlobeInner({
           );
         })()}
       </div>
-      {/* â”€â”€ Loading overlay â”€â”€ */}
+      {/* ------ Loading overlay ------ */}
       {loading && (
         <div
           style={{
@@ -1004,10 +1007,10 @@ function GlobeInner({
         width={dimensions.width}
         height={dimensions.height}
         rendererConfig={GLOBE_RENDERER_CONFIG}
-        /* â”€â”€ Textures â”€â”€ */
+        /* ------ Textures ------ */
         globeImageUrl={isNightMode ? GLOBE_NIGHT_URL : GLOBE_DAY_URL}
         bumpImageUrl={undefined}
-        /* â”€â”€ Scene â”€â”€ */
+        /* ------ Scene ------ */
         backgroundColor="rgba(0,0,0,0)"
         backgroundImageUrl={GLOBE_BACKGROUND_URL}
         enablePointerInteraction={!paused}
@@ -1015,21 +1018,46 @@ function GlobeInner({
         atmosphereColor={isNightMode ? "#0066cc" : "#00bfff"}
         atmosphereAltitude={atmosphereIntensity}
         animateIn={false}
-        /* â”€â”€ Country polygons â”€â”€ */
+        /* ------ Country polygons ------ */
         polygonsData={countries}
-        polygonCapColor={() =>
-          paused ? "rgba(0,0,0,0)" : "rgba(0, 255, 255, 0.02)"
-        }
-        polygonSideColor={() => paused ? "rgba(0,0,0,0)" : "rgba(0, 255, 255, 0.05)"}
-        polygonStrokeColor={() => paused ? "rgba(0,0,0,0)" : "#00ffff"}
-        polygonAltitude={() => 0.005}
+        polygonCapColor={(feat: any) => {
+          if (paused) return "rgba(0,0,0,0)";
+          const iso = resolveIsoA2(feat?.properties ?? {});
+          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+            return "rgba(255, 40, 40, 0.45)";
+          }
+          return "rgba(0, 255, 255, 0.02)";
+        }}
+        polygonSideColor={(feat: any) => {
+          if (paused) return "rgba(0,0,0,0)";
+          const iso = resolveIsoA2(feat?.properties ?? {});
+          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+            return "rgba(255, 40, 40, 0.6)";
+          }
+          return "rgba(0, 255, 255, 0.05)";
+        }}
+        polygonStrokeColor={(feat: any) => {
+          if (paused) return "rgba(0,0,0,0)";
+          const iso = resolveIsoA2(feat?.properties ?? {});
+          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+            return "#ff2828";
+          }
+          return "#00ffff";
+        }}
+        polygonAltitude={(feat: any) => {
+          const iso = resolveIsoA2(feat?.properties ?? {});
+          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+            return 0.018;
+          }
+          return 0.005;
+        }}
         polygonCapCurvatureResolution={1}
-        polygonLabel={() => ''}
-        /* â”€â”€ Interaction â”€â”€ */
+        polygonLabel={() => ""}
+        /* Interaction */
         onPolygonHover={handlePolygonHover}
         onPolygonClick={handlePolygonClick}
-        /* â”€â”€ Performance â”€â”€ */
-        polygonsTransitionDuration={0}
+        /* Performance */
+        polygonsTransitionDuration={300}
       />
     </div>
   );
