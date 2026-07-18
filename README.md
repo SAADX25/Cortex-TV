@@ -142,6 +142,9 @@ Cortex TV/
 │   │   │   │   ├── 📄 Stars.tsx       # Starfield background
 │   │   │   │   ├── 📄 Crosshair.tsx   # Targeting crosshair
 │   │   │   │   └── 📄 Loading.tsx     # Loading screen
+│   │   │   ├── 📁 data/
+│   │   │   │   ├── 📄 geoData.ts           # Country mappings & metadata
+│   │   │   │   └── 📄 geoJsonCache.ts      # IndexedDB cache for GeoJSON
 │   │   │   ├── 📁 shaders/
 │   │   │   │   ├── 📄 earthShader.ts       # GLSL shader for Earth surface
 │   │   │   │   └── 📄 atmosphereShader.ts  # GLSL shader for atmosphere
@@ -214,10 +217,6 @@ Cortex TV/
 ├── 📁 electron/                       # Electron main process
 │   ├── 📄 main.ts                     # Main Process — window management + IPC
 │   └── 📄 preload.ts                  # Preload Script — secure bridge between Renderer and Main
-│
-├── 📁 cloudflare-worker/              # Cloudflare Edge Worker
-│   ├── 📄 worker.js                   # CORS Proxy + Edge logic
-│   └── 📄 wrangler.toml               # Cloudflare deployment config
 │
 ├── 📁 android/                        # Capacitor Android project (Android Studio)
 ├── 📁 public/                         # Static public assets (icons, manifests)
