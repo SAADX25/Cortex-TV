@@ -1,4 +1,4 @@
-﻿import { memo, useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useDeferredValue, useMemo, useRef, useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "@/shared/types";
 import {
@@ -333,11 +333,6 @@ export default function ChannelList({
             <h2 className="mt-1 truncate text-xl font-bold text-white">{title}</h2>
             <p className="mt-1 text-xs text-white/35">{channels.length} channels / {channels.filter((channel) => channel.streamUrl).length} with streams</p>
           </div>
-          {onClose && (
-            <button type="button" onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.04] text-white/45 transition-all hover:bg-white/10 hover:text-white" aria-label="Close channel list">
-              <CloseIcon />
-            </button>
-          )}
         </div>
 
         <div className="mt-4 flex h-10 items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 transition-all duration-200 focus-within:border-cyan-300/38 focus-within:bg-cyan-300/[0.04] focus-within:shadow-[0_0_18px_rgba(34,211,238,0.07)]">
@@ -422,6 +417,18 @@ export default function ChannelList({
             <span className="text-emerald-300/55">{liveCount} with streams</span>
           </div>
         </div>
+      )}
+
+      {/* Floating close button - easily accessible above the star button */}
+      {onClose && (
+        <button
+          type="button"
+          onClick={onClose}
+          className="fixed bottom-[5.5rem] left-1/2 z-[100] -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-cyan-400/20 bg-[#0A192F]/90 backdrop-blur-md text-cyan-50 shadow-[0_8px_32px_rgba(0,0,0,0.6)] transition-all hover:bg-[#0f2444] hover:text-white hover:border-cyan-400/40 active:scale-95 md:absolute md:top-4 md:right-4 md:bottom-auto md:left-auto md:translate-x-0 md:h-10 md:w-10 md:rounded-xl md:border-white/[0.12] md:bg-white/[0.06] md:text-white/60 md:shadow-none"
+          aria-label="Close channel list"
+        >
+          <CloseIcon />
+        </button>
       )}
     </div>
   );

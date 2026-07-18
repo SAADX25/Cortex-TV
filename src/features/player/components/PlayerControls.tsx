@@ -13,12 +13,12 @@ export function FloatingControls({ isMobile, onClose, channel, isFav, onToggleFa
     return (
       <button
         onClick={onClose}
-        className="absolute top-[max(var(--cortex-safe-top),3rem)] left-4 z-[10000] bg-black/70 text-white p-3 rounded-full backdrop-blur-md cursor-pointer active:scale-90 transition-transform shadow-lg"
+        className="fixed bottom-[5.5rem] left-1/2 z-[10000] -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-cyan-400/20 bg-[#0A192F]/90 backdrop-blur-md text-cyan-50 shadow-[0_8px_32px_rgba(0,0,0,0.6)] transition-all hover:bg-[#0f2444] hover:text-white hover:border-cyan-400/40 active:scale-95"
         aria-label="Close player"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="m12 19-7-7 7-7" />
-          <path d="M19 12H5" />
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
     );

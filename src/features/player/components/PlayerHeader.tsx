@@ -49,7 +49,7 @@ export default function PlayerHeader({
       />
       <button
         onClick={onClose}
-        className="shrink-0 flex items-center justify-center h-8 w-8 rounded-lg border border-white/10 bg-white/5 text-white/60 hover:text-white active:scale-95 transition-all"
+        className="shrink-0 hidden md:flex items-center justify-center h-8 w-8 rounded-lg border border-white/10 bg-white/5 text-white/60 hover:text-white active:scale-95 transition-all"
         title="Stop & close"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

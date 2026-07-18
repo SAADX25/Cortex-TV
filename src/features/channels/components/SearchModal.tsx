@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Virtuoso } from "react-virtuoso";
 import {
@@ -459,13 +459,13 @@ export default function SearchModal({
 
   return (
     <div
-      className={`fixed inset-0 z-[200] flex items-start justify-center bg-black/42 px-2 mobile-safe-modal-top backdrop-blur-[2px] sm:px-4 md:pt-24 ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
+      className={`fixed inset-0 z-[200] flex items-start justify-center bg-black/42 px-0 mobile-safe-modal-top-zero backdrop-blur-[2px] md:px-4 md:pt-24 ${closing ? "animate-backdrop-out" : "animate-backdrop-in"}`}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) handleClose();
       }}
     >
-      <div className={`w-[calc(100%-0.75rem)] max-w-[760px] max-h-[calc(100dvh_-_var(--cortex-safe-top)_-_5.75rem)] overflow-hidden rounded-[22px] border border-cyan-200/[0.14] bg-[#07101f]/98 shadow-[0_24px_90px_rgba(0,0,0,0.58)] sm:w-full md:max-h-none md:rounded-2xl ${closing ? "animate-modal-out" : "animate-modal-in"}`}>
-        <div className="bg-[#0a1628]/98 p-3.5 md:p-5">
+      <div className={`w-full max-w-[760px] max-h-[calc(100dvh_-_5.75rem)] overflow-hidden rounded-b-[22px] border-b border-cyan-200/[0.14] bg-[#07101f]/98 shadow-[0_24px_90px_rgba(0,0,0,0.58)] md:max-h-none md:rounded-2xl md:border ${closing ? "animate-modal-out" : "animate-modal-in"}`}>
+        <div className="bg-[#0a1628]/98 p-3.5 md:p-5 pt-[max(var(--cortex-safe-top),0.875rem)] md:pt-5">
           <div className="mb-3 flex items-center justify-between gap-3 md:mb-4 md:items-start md:gap-4">
             <div className="min-w-0 pr-1">
               <p className="text-[9px] font-bold uppercase tracking-[0.22em] text-cyan-200/62 md:text-[10px] md:tracking-[0.24em] md:text-cyan-200/70">Global search</p>
@@ -481,15 +481,6 @@ export default function SearchModal({
               >
                 <SlidersIcon />
                 {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-cyan-300 px-1 text-[10px] font-bold text-slate-950">{activeFilterCount}</span>}
-              </button>
-              <button
-                type="button"
-                onClick={handleClose}
-                className="flex h-10 w-10 items-center justify-center rounded-[14px] border border-white/[0.11] bg-white/[0.06] text-white/62 transition-all hover:border-white/[0.20] hover:bg-white/[0.09] hover:text-white md:h-11 md:w-11 md:rounded-xl"
-                aria-label="Close search"
-                title="Close"
-              >
-                <CloseIcon />
               </button>
             </div>
           </div>
@@ -604,6 +595,16 @@ export default function SearchModal({
           </div>
         )}
       </div>
+
+      {/* Floating close button - easily accessible above the star button */}
+      <button
+        type="button"
+        onClick={handleClose}
+        className="fixed bottom-[5.5rem] left-1/2 z-[250] -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-cyan-400/20 bg-[#0A192F]/90 backdrop-blur-md text-cyan-50 shadow-[0_8px_32px_rgba(0,0,0,0.6)] transition-all hover:bg-[#0f2444] hover:text-white hover:border-cyan-400/40 active:scale-95 md:absolute md:top-4 md:right-4 md:bottom-auto md:left-auto md:translate-x-0 md:h-11 md:w-11 md:rounded-xl md:border-white/[0.11] md:bg-white/[0.06] md:text-white/62 md:shadow-none"
+        aria-label="Close search"
+      >
+        <CloseIcon />
+      </button>
     </div>
   );
 }

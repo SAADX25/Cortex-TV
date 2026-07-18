@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getBrowseMetadata,
   type BrowseMetadata,
@@ -448,9 +448,6 @@ export default function HomeExperience({
                     {sheet === "countries" ? "Countries" : sheet === "categories" ? "Categories" : "About Cortex TV"}
                   </h2>
                 </div>
-                <button type="button" onClick={() => setSheet(null)} className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/[0.08] bg-white/[0.05] text-white/62" aria-label="Close sheet">
-                  <CloseIcon />
-                </button>
               </div>
               {sheet === "countries" && (
                 <>
@@ -489,6 +486,16 @@ export default function HomeExperience({
               </div>
             )}
           </div>
+          
+          {/* Floating close button - easily accessible above the star button */}
+          <button
+            type="button"
+            onClick={() => setSheet(null)}
+            className="fixed bottom-[5.5rem] left-1/2 z-[9300] -translate-x-1/2 flex h-14 w-14 items-center justify-center rounded-[1.25rem] border border-cyan-400/20 bg-[#0A192F]/90 backdrop-blur-md text-cyan-50 shadow-[0_8px_32px_rgba(0,0,0,0.6)] transition-all hover:bg-[#0f2444] hover:text-white hover:border-cyan-400/40 active:scale-95"
+            aria-label="Close sheet"
+          >
+            <CloseIcon />
+          </button>
         </div>
       )}
 
