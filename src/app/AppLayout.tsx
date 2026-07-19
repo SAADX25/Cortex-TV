@@ -26,7 +26,7 @@ import {
   type MetadataOption,
   type SearchFilters,
 } from "@/features/iptv/hooks/useIPTV";
-import { fetchAndParseM3U } from "@/features/iptv/parser/m3uParser";
+import { fetchAndParseM3U } from "@/features/iptv/services/playlistService";
 import { useUIStore } from "@/stores/useUIStore";
 import { usePlayerStore } from "@/stores/usePlayerStore";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";

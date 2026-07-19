@@ -32,7 +32,6 @@ function createWindow() {
     backgroundColor: "#000000",
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
       nodeIntegration: false,
       contextIsolation: true,
       webgl: true,

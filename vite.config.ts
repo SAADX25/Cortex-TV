@@ -81,21 +81,6 @@ export default defineConfig({
           },
         },
       },
-      {
-        // ── Preload script ──
-        entry: "electron/preload.ts",
-        onstart({ reload }) {
-          reload();
-        },
-        vite: {
-          build: {
-            outDir: "dist-electron",
-            rollupOptions: {
-              external: ["electron"],
-            },
-          },
-        },
-      },
     ]),
     renderer(),
   ],

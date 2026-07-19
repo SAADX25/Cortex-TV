@@ -24,46 +24,15 @@ import PlayerHeader from "./PlayerHeader";
 import VideoSurface from "./VideoSurface";
 import { FloatingControls } from "./PlayerControls";
 
-type StreamStatus = "loading" | "playing" | "error";
-import { Virtuoso } from "react-virtuoso";
 import type { ChannelWithStream } from "@/shared/types";
 import { resolveStream } from "@/features/iptv/services/StreamResolver";
+import { createPlayerLogLine, logPlayerDebug } from "@/features/player/services/playerLogger";
+import type { PlayerProps, StreamStatus } from "../types";
 import { flagUrl, cleanName, GEO_BLOCK_COUNTRIES, getStreamHealth } from "@/shared/lib/channelUtils";
 import ChannelList from "@/features/channels/components/ChannelList";
 
-interface PlayerProps {
-  channel: ChannelWithStream;
-  onClose: () => void;
-  /** Channels to display in the sidebar panel (Famelack layout, desktop only) */
-  sidebarChannels?: ChannelWithStream[];
-  sidebarCountryName?: string;
-  sidebarLoading?: boolean;
-  sidebarError?: string | null;
-  favorites?: ChannelWithStream[];
-  onToggleFavorite?: (ch: ChannelWithStream) => void;
-  onPlayChannel?: (ch: ChannelWithStream) => void;
-  /** Called by the green back button in the sidebar header */
-  onBack?: () => void;
-  customProxyUrl?: string;
-}
 
 
-
-/* ── Strip geo-block noise from channel names ── */
-const CLEAN_RE = /\[geo[- ]?blocked\]|\[blocked\]|\[not 24\/7\]/gi;
-
-/* ── Fallback TV icon for sidebar rows ── */
-function SidebarFallbackIcon() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-      fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
-      className="text-white/30"
-    >
-      <rect x="2" y="7" width="20" height="15" rx="2" ry="2" />
-      <polyline points="17 2 12 7 7 2" />
-    </svg>
-  );
-}
 
 export default function Player({
   channel,
@@ -142,10 +111,8 @@ export default function Player({
 
   /** Append a timestamped line to the on-screen debug log */
   const addDebugLine = useCallback((msg: string) => {
-    const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
-    const line = `[${ts}] ${msg}`;
-    console.log(`[Player-Debug] ${msg}`);
-    setDebugLog((prev) => [...prev.slice(-40), line]);
+    logPlayerDebug(msg);
+    setDebugLog((prev) => [...prev.slice(-40), createPlayerLogLine(msg)]);
   }, []);
 
   /* ── Mobile-device flag (stable across rotations — uses shortest screen edge) ── */

@@ -1,4 +1,4 @@
-﻿import type { ChannelWithStream } from "@/shared/types";
+import type { ChannelWithStream } from "@/shared/types";
 
 export interface PlayerProps {
   channel: ChannelWithStream;
@@ -11,6 +11,7 @@ export interface PlayerProps {
   onToggleFavorite?: (ch: ChannelWithStream) => void;
   onPlayChannel?: (ch: ChannelWithStream) => void;
   onBack?: () => void;
+  customProxyUrl?: string;
 }
 
 export type StreamStatus = "loading" | "playing" | "error";
