@@ -89,36 +89,125 @@ function resolveIsoA2(props: Record<string, any>): string {
 }
 
 /** Return formatted local time for a country ISO-A2 code, or null. */
+const dateTimeFormatCache: Record<string, Intl.DateTimeFormat> = {};
 function getCountryTime(iso: string): string | null {
   const tz = COUNTRY_TZ[iso.toUpperCase()];
   if (!tz) return null;
   try {
-    return new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date());
+    if (!dateTimeFormatCache[tz]) {
+      dateTimeFormatCache[tz] = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz,
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      });
+    }
+    return dateTimeFormatCache[tz].format(new Date());
   } catch {
     return null;
   }
 }
 
 /** Translate an ISO-A2 region code to a localised country name via Intl.DisplayNames. */
+const displayNamesCache: Record<string, Intl.DisplayNames> = {};
 function getTranslatedCountryName(
   countryCode: string,
   lang: "en" | "ar"
 ): string {
   try {
-    return (
-      new Intl.DisplayNames([lang], { type: "region" }).of(
-        countryCode.toUpperCase()
-      ) || countryCode
-    );
+    if (!displayNamesCache[lang]) {
+      displayNamesCache[lang] = new Intl.DisplayNames([lang], { type: "region" });
+    }
+    return displayNamesCache[lang].of(countryCode.toUpperCase()) || countryCode;
   } catch {
     return countryCode;
   }
 }
+
+/** Standalone component for the badge to prevent GlobeInner from re-rendering every second */
+const CountryInfoBadge = memo(function CountryInfoBadge({ 
+  targetedCountry, 
+  uiLang 
+}: { 
+  targetedCountry: { name: string; iso: string } | null; 
+  uiLang: "en" | "ar";
+}) {
+  const [localTime, setLocalTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!targetedCountry?.iso) { 
+      setLocalTime(null); 
+      return; 
+    }
+    const tick = () => setLocalTime(getCountryTime(targetedCountry.iso));
+    tick(); // immediate first render
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [targetedCountry?.iso]);
+
+  const hasIso = targetedCountry?.iso?.length === 2;
+  const displayName = targetedCountry ? (hasIso
+    ? getTranslatedCountryName(targetedCountry.iso, uiLang)
+    : targetedCountry.name) : '';
+  const capital = hasIso ? COUNTRY_CAPITAL[targetedCountry.iso.toUpperCase()] : null;
+  const showDetails = !!(capital && localTime);
+
+  return (
+    <div
+      className={`fixed top-14 mobile-safe-badge-top left-1/2 -translate-x-1/2 z-50 pointer-events-none
+                  transition-all duration-200 origin-top
+                  ${targetedCountry
+                    ? "opacity-100 scale-100"
+                    : "opacity-0 scale-90 pointer-events-none"}`}
+      style={{
+        background: 'rgba(15, 23, 42, 0.6)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        borderRadius: 16,
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        padding: '12px 20px',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+        minWidth: 180,
+      }}
+    >
+      {targetedCountry && (
+        <div className="flex flex-col items-center gap-1.5">
+          <div className="flex items-center gap-2.5">
+            {hasIso ? (
+              <img
+                src={flagUrl(targetedCountry.iso)}
+                alt=""
+                width={24}
+                height={18}
+                className="rounded-[3px] shadow-sm object-cover"
+                style={{ minWidth: 24 }}
+              />
+            ) : (
+              <span className="text-lg leading-none">{"\u{1F30D}"}</span>
+            )}
+            <span
+              className="text-[15px] font-bold text-white tracking-wide"
+              dir={uiLang === 'ar' ? 'rtl' : 'ltr'}
+            >
+              {displayName}
+            </span>
+          </div>
+          {showDetails && (
+            <div className="flex items-center gap-1.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: '#94a3b8' }}>
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span className="text-xs tabular-nums font-medium" style={{ color: '#cbd5e1' }}>{localTime}</span>
+              <span className="text-xs" style={{ color: 'rgba(148, 163, 184, 0.5)' }}>{"\u2022"}</span>
+              <span className="text-xs" style={{ color: '#cbd5e1' }}>{capital}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
 
 /** Convert ISO-A2 code to flag emoji (regional indicator symbols). */
 function isoToFlag(iso: string): string {
@@ -228,7 +317,6 @@ function GlobeInner({
     name: string;
     iso: string;
   } | null>(null);
-  const [localTime, setLocalTime] = useState<string | null>(null);
 
   /* ------ Language toggle state ------ */
   const [uiLang, setUiLang] = useState<"en" | "ar">("en");
@@ -259,6 +347,11 @@ function GlobeInner({
         const cached = await getCachedGeoJson(GEOJSON_URL);
         if (cached && active) {
           const features = cached.features || cached;
+          features.forEach((f: any) => {
+            if (f.__isoA2 === undefined) {
+              f.__isoA2 = resolveIsoA2(f.properties ?? {});
+            }
+          });
           console.log(`[Globe] GeoJSON loaded from cache: ${features.length} countries`);
           setCountries(features);
           setLoading(false);
@@ -271,6 +364,11 @@ function GlobeInner({
 
         if (active) {
           const features = data.features || data;
+          features.forEach((f: any) => {
+            if (f.__isoA2 === undefined) {
+              f.__isoA2 = resolveIsoA2(f.properties ?? {});
+            }
+          });
           console.log(`[Globe] GeoJSON loaded from network: ${features.length} countries`);
           setCountries(features);
           setLoading(false);
@@ -437,6 +535,7 @@ function GlobeInner({
     if (!focusCountryIso || !globeRef.current || countries.length === 0) return;
     const iso = focusCountryIso.toUpperCase();
     const feature = countries.find((f: any) => {
+      if (f.__isoA2) return f.__isoA2.toUpperCase() === iso;
       const p = f.properties ?? {};
       return (
         (p.ISO_A2 ?? "").toUpperCase() === iso ||
@@ -483,7 +582,7 @@ function GlobeInner({
     if (!feature) return null;
     const props = feature.properties ?? {};
     const adminName = props.ADMIN || props.NAME || 'Unknown';
-    const iso = resolveIsoA2(props);
+    const iso = feature.__isoA2 !== undefined ? feature.__isoA2 : resolveIsoA2(props);
     // Always produce a human-readable name, never a raw code
     const name = iso
       ? getTranslatedCountryName(iso, 'en')
@@ -653,7 +752,6 @@ function GlobeInner({
     if (!IS_TOUCH_DEVICE) return;
     if (paused) {
       setTargetedCountry((prev) => (prev !== null ? null : prev));
-      setLocalTime((prev) => (prev !== null ? null : prev));
       return;
     }
 
@@ -663,12 +761,6 @@ function GlobeInner({
     setTargetedCountry((prev) => {
       if (prev?.iso === info?.iso) return prev;
       return info ?? null;
-    });
-    
-    setLocalTime((prev) => {
-      const newTime = info?.iso ? getCountryTime(info.iso) : null;
-      if (prev === newTime) return prev;
-      return newTime;
     });
   }, [paused, getCenterCountryGeo, extractCountryInfo]);
 
@@ -680,6 +772,10 @@ function GlobeInner({
     let lastUpdate = 0;
     const loop = (time: number = performance.now()) => {
       if (!active) return;
+      if (window.innerWidth >= 1024) {
+        rafIdRef.current = requestAnimationFrame(loop);
+        return;
+      }
       if (time - lastUpdate >= MOBILE_TARGET_INTERVAL_MS) {
         lastUpdate = time;
         updateTargetLabel();
@@ -689,15 +785,6 @@ function GlobeInner({
     rafIdRef.current = requestAnimationFrame(loop);
     return () => { active = false; cancelAnimationFrame(rafIdRef.current); };
   }, [paused, updateTargetLabel]);
-
-  /* ------ Tick the live clock every second when a country is targeted ------ */
-  useEffect(() => {
-    if (!targetedCountry?.iso) { setLocalTime(null); return; }
-    const tick = () => setLocalTime(getCountryTime(targetedCountry.iso));
-    tick(); // immediate first render
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [targetedCountry?.iso]);
 
   /* ------ Bulletproof event blocker for UI overlays ------ */
   const killEvent = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
@@ -755,7 +842,6 @@ function GlobeInner({
       if (IS_TOUCH_DEVICE || paused) return;
       if (!polygon) {
         setTargetedCountry((prev) => (prev !== null ? null : prev));
-        setLocalTime((prev) => (prev !== null ? null : prev));
         return;
       }
       const info = extractCountryInfo(polygon);
@@ -763,14 +849,47 @@ function GlobeInner({
         if (prev?.iso === info?.iso) return prev;
         return info ?? null;
       });
-      setLocalTime((prev) => {
-        const newTime = info?.iso ? getCountryTime(info.iso) : null;
-        if (prev === newTime) return prev;
-        return newTime;
-      });
     },
     [paused, extractCountryInfo]
   );
+
+  /* ------ Memoized Accessors for react-globe.gl ------ */
+  const getPolygonCapColor = useCallback((feat: any) => {
+    if (paused) return "rgba(0,0,0,0)";
+    const iso = feat.__isoA2;
+    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+      return "rgba(255, 40, 40, 0.45)";
+    }
+    return "rgba(0, 255, 255, 0.02)";
+  }, [paused, selectedCountryIso]);
+
+  const getPolygonSideColor = useCallback((feat: any) => {
+    if (paused) return "rgba(0,0,0,0)";
+    const iso = feat.__isoA2;
+    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+      return "rgba(255, 40, 40, 0.6)";
+    }
+    return "rgba(0, 255, 255, 0.05)";
+  }, [paused, selectedCountryIso]);
+
+  const getPolygonStrokeColor = useCallback((feat: any) => {
+    if (paused) return "rgba(0,0,0,0)";
+    const iso = feat.__isoA2;
+    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+      return "#ff2828";
+    }
+    return "#00ffff";
+  }, [paused, selectedCountryIso]);
+
+  const getPolygonAltitude = useCallback((feat: any) => {
+    const iso = feat.__isoA2;
+    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
+      return 0.018;
+    }
+    return 0.005;
+  }, [selectedCountryIso]);
+
+  const getPolygonLabel = useCallback(() => "", []);
 
   return (
     <div
@@ -817,70 +936,7 @@ function GlobeInner({
       <Crosshair active={crosshairActive} />
 
       {/* ------ Country Info Badge (iOS Glassmorphism) ------ */}
-      <div
-        className={`fixed top-14 mobile-safe-badge-top left-1/2 -translate-x-1/2 z-50 pointer-events-none
-                    transition-all duration-200 origin-top
-                    ${targetedCountry
-                      ? "opacity-100 scale-100"
-                      : "opacity-0 scale-90 pointer-events-none"}`}
-        style={{
-          background: 'rgba(15, 23, 42, 0.6)',
-          backdropFilter: 'blur(12px)',
-          WebkitBackdropFilter: 'blur(12px)',
-          borderRadius: 16,
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-          padding: '12px 20px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
-          minWidth: 180,
-        }}
-      >
-        {targetedCountry && (() => {
-          const hasIso = targetedCountry.iso.length === 2;
-          const displayName = hasIso
-            ? getTranslatedCountryName(targetedCountry.iso, uiLang)
-            : targetedCountry.name;
-          const capital = hasIso ? COUNTRY_CAPITAL[targetedCountry.iso.toUpperCase()] : null;
-          const time = localTime;
-          const showDetails = !!(capital && time);
-          return (
-            <div className="flex flex-col items-center gap-1.5">
-              {/* ------ Top Row: Flag + Country Name ------ */}
-              <div className="flex items-center gap-2.5">
-                {hasIso ? (
-                  <img
-                    src={flagUrl(targetedCountry.iso)}
-                    alt=""
-                    width={24}
-                    height={18}
-                    className="rounded-[3px] shadow-sm object-cover"
-                    style={{ minWidth: 24 }}
-                  />
-                ) : (
-                  <span className="text-lg leading-none">{"\u{1F30D}"}</span>
-                )}
-                <span
-                  className="text-[15px] font-bold text-white tracking-wide"
-                  dir={uiLang === 'ar' ? 'rtl' : 'ltr'}
-                >
-                  {displayName}
-                </span>
-              </div>
-              {/* ------ Bottom Row: Clock + Time + Capital (only if data exists) ------ */}
-              {showDetails && (
-                <div className="flex items-center gap-1.5">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0" style={{ color: '#94a3b8' }}>
-                    <circle cx="12" cy="12" r="10" />
-                    <polyline points="12 6 12 12 16 14" />
-                  </svg>
-                  <span className="text-xs tabular-nums font-medium" style={{ color: '#cbd5e1' }}>{time}</span>
-                  <span className="text-xs" style={{ color: 'rgba(148, 163, 184, 0.5)' }}>{"\u2022"}</span>
-                  <span className="text-xs" style={{ color: '#cbd5e1' }}>{capital}</span>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-      </div>
+      <CountryInfoBadge targetedCountry={targetedCountry} uiLang={uiLang} />
       {/* ------ Loading overlay ------ */}
       {loading && (
         <div
@@ -925,39 +981,12 @@ function GlobeInner({
         animateIn={false}
         /* ------ Country polygons ------ */
         polygonsData={countries}
-        polygonCapColor={(feat: any) => {
-          if (paused) return "rgba(0,0,0,0)";
-          const iso = resolveIsoA2(feat?.properties ?? {});
-          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-            return "rgba(255, 40, 40, 0.45)";
-          }
-          return "rgba(0, 255, 255, 0.02)";
-        }}
-        polygonSideColor={(feat: any) => {
-          if (paused) return "rgba(0,0,0,0)";
-          const iso = resolveIsoA2(feat?.properties ?? {});
-          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-            return "rgba(255, 40, 40, 0.6)";
-          }
-          return "rgba(0, 255, 255, 0.05)";
-        }}
-        polygonStrokeColor={(feat: any) => {
-          if (paused) return "rgba(0,0,0,0)";
-          const iso = resolveIsoA2(feat?.properties ?? {});
-          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-            return "#ff2828";
-          }
-          return "#00ffff";
-        }}
-        polygonAltitude={(feat: any) => {
-          const iso = resolveIsoA2(feat?.properties ?? {});
-          if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-            return 0.018;
-          }
-          return 0.005;
-        }}
+        polygonCapColor={getPolygonCapColor}
+        polygonSideColor={getPolygonSideColor}
+        polygonStrokeColor={getPolygonStrokeColor}
+        polygonAltitude={getPolygonAltitude}
         polygonCapCurvatureResolution={1}
-        polygonLabel={() => ""}
+        polygonLabel={getPolygonLabel}
         /* Interaction */
         onPolygonHover={handlePolygonHover}
         onPolygonClick={handlePolygonClick}

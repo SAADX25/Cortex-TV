@@ -41,7 +41,7 @@ function createWindow() {
   });
 
   // ── Open DevTools in development ──
-  if (IS_DEV) {
+  if (IS_DEV && process.env.VITE_OPEN_DEVTOOLS === "true") {
     mainWindow.webContents.openDevTools({ mode: "detach" });
   }
 
@@ -50,6 +50,15 @@ function createWindow() {
     mainWindow?.show();
     mainWindow?.focus();
   });
+
+  // A hidden WebGL/video window does not need to render at display speed.
+  mainWindow.on("minimize", () => {
+    mainWindow?.webContents.setFrameRate(1);
+  });
+  mainWindow.on("restore", () => {
+    mainWindow?.webContents.setFrameRate(60);
+  });
+
 
   mainWindow.on("closed", () => {
     mainWindow = null;
