@@ -457,78 +457,76 @@ function GlobeInner({
     controls.autoRotateSpeed = (paused || !autoRotate) ? 0 : rotationSpeed;
   }, [rotationSpeed, autoRotate, paused]);
 
-  /* ------ Freeze / resume the Three.js render loop (battery saver) ------
-     When paused, setAnimationLoop(null) cancels the internal rAF.
-     No frames rendered, no shaders execute --- 0% GPU while hidden.
-     On resume the existing WebGL context + textures are reused instantly. */
+  /* ------ Freeze / resume the Three.js render loop (battery saver) ------ */
+  const lastWakeTimeRef = useRef(Date.now());
+  const isAwakeRef = useRef(true);
+
+  const wakeGlobe = useCallback(() => {
+    lastWakeTimeRef.current = Date.now();
+    if (!isAwakeRef.current) {
+      isAwakeRef.current = true;
+      globeRef.current?.resumeAnimation();
+    }
+  }, []);
+
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
-    const renderer = globe.renderer?.();
-    if (!renderer) return;
     
     // Auto mode tweaks for performance
-    const isAuto = globeFps === "auto";
-    const targetPixelRatio = highQualityGraphics
-      ? Math.min(window.devicePixelRatio || 1, 3) // Up to 3x for sharp rendering on retina displays
-      : isAuto 
-        ? Math.min(window.devicePixelRatio || 1, 0.75) // Lower resolution for Auto to save GPU
-        : Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO);
-    renderer.setPixelRatio(targetPixelRatio);
-    const currentSize = renderer.getSize(new THREE.Vector2());
-    renderer.setSize(currentSize.width, currentSize.height, false);
-    
-    // Export renderer stats for DebugPanel
-    if (import.meta.env.DEV) {
-      (window as any).__cortexGlobeRendererInfo = renderer.info.memory;
+    const renderer = globe.renderer?.();
+    if (renderer) {
+      const isAuto = globeFps === "auto";
+      const targetPixelRatio = highQualityGraphics
+        ? Math.min(window.devicePixelRatio || 1, 3) 
+        : isAuto 
+          ? Math.min(window.devicePixelRatio || 1, 0.75) 
+          : Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO);
+      renderer.setPixelRatio(targetPixelRatio);
+      const currentSize = renderer.getSize(new THREE.Vector2());
+      renderer.setSize(currentSize.width, currentSize.height, false);
+      
+      if (import.meta.env.DEV) {
+        (window as any).__cortexGlobeRendererInfo = renderer.info.memory;
+      }
     }
-    
-    let lastFrame = 0;
-
-    /* Compute the frame interval (ms) from globeFps prop */
-    const computeFrameMs = () => {
-      if (globeFps === 30) return 1000 / 30;
-      if (globeFps === 60) return 1000 / 60;
-      // "auto" mode: use quality-based FPS. Respect prefers-reduced-motion.
-      const autoFps = PREFERS_REDUCED_MOTION
-        ? Math.min(AUTO_GLOBE_TARGET_FPS, 15)
-        : AUTO_GLOBE_TARGET_FPS;
-      return 1000 / autoFps;
-    };
-    const frameMs = computeFrameMs();
 
     const ctrl = globe.controls?.();
-    const requestRender = () => { renderRequestedRef.current = true; };
+    const requestRender = () => { 
+      wakeGlobe(); 
+    };
     if (ctrl) {
       ctrl.addEventListener("change", requestRender);
     }
 
-    if (paused) {
-      renderer.setAnimationLoop(null);
-    } else {
-      renderer.setAnimationLoop((time: number = performance.now()) => {
-        if (time - lastFrame < frameMs) return;
-
-        if (ctrl) ctrl.update();
-
-        const isAutoRotating = autoRotate && !paused && rotationSpeed > 0;
-        const isAnimating = time < animationEndTimeRef.current;
-        const shouldRender = renderRequestedRef.current || isAnimating || isAutoRotating;
-
-        if (shouldRender) {
-          lastFrame = time;
-          renderRequestedRef.current = false;
-          renderer.render(globe.scene(), globe.camera());
+    // Timer to put the globe to sleep when idle to save CPU
+    const interval = setInterval(() => {
+      if (paused) {
+        if (isAwakeRef.current) {
+          isAwakeRef.current = false;
+          globe?.pauseAnimation();
         }
-      });
-    }
+        return;
+      }
 
-    /* Cleanup: ensure the loop is stopped if the component unmounts while running */
+      if (autoRotate && rotationSpeed > 0) {
+        wakeGlobe(); // Keep awake if auto-rotating
+        return;
+      }
+
+      const idleTime = Date.now() - lastWakeTimeRef.current;
+      if (idleTime > 1500 && isAwakeRef.current) {
+        isAwakeRef.current = false;
+        globe?.pauseAnimation();
+      }
+    }, 500);
+
+    /* Cleanup */
     return () => {
+      clearInterval(interval);
       if (ctrl) ctrl.removeEventListener("change", requestRender);
-      renderer.setAnimationLoop(null);
     };
-  }, [paused, highQualityGraphics, globeFps, autoRotate, rotationSpeed]);
+  }, [paused, highQualityGraphics, globeFps, autoRotate, rotationSpeed, wakeGlobe]);
 
   /* ------ Fly to country when focusCountryIso changes ------ */
   useEffect(() => {
@@ -767,15 +765,11 @@ function GlobeInner({
   /* rAF loop: runs every frame while the globe is visible (mobile only).
      This catches auto-rotation, inertia, and active dragging at native refresh rate. */
   useEffect(() => {
-    if (!IS_TOUCH_DEVICE || paused) return;
+    if (!IS_TOUCH_DEVICE || paused || dimensions.width >= 1024) return;
     let active = true;
     let lastUpdate = 0;
     const loop = (time: number = performance.now()) => {
       if (!active) return;
-      if (window.innerWidth >= 1024) {
-        rafIdRef.current = requestAnimationFrame(loop);
-        return;
-      }
       if (time - lastUpdate >= MOBILE_TARGET_INTERVAL_MS) {
         lastUpdate = time;
         updateTargetLabel();
@@ -784,7 +778,7 @@ function GlobeInner({
     };
     rafIdRef.current = requestAnimationFrame(loop);
     return () => { active = false; cancelAnimationFrame(rafIdRef.current); };
-  }, [paused, updateTargetLabel]);
+  }, [paused, dimensions.width, updateTargetLabel]);
 
   /* ------ Bulletproof event blocker for UI overlays ------ */
   const killEvent = useCallback((e: React.SyntheticEvent) => e.stopPropagation(), []);
@@ -896,8 +890,10 @@ function GlobeInner({
       ref={containerRef}
       className="w-full h-full"
       style={{ touchAction: "none" }}
-      onPointerDown={handlePointerDown}
+      onPointerDown={(e) => { wakeGlobe(); handlePointerDown(e); }}
       onPointerUp={handlePointerUp}
+      onPointerMove={wakeGlobe}
+      onWheel={wakeGlobe}
     >
       {/* ------ Language toggle button (top-left, mirrors Dark-Mode on the right) ------ */}
       <button
