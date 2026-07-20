@@ -14,6 +14,7 @@ import {
   getStreamHealth,
   isUsableStream,
   normalizeSearchText,
+  countryNameAr,
 } from "@/shared/lib/channelUtils";
 
 interface HomeExperienceProps {
@@ -240,7 +241,8 @@ export default function HomeExperience({
     const query = normalizeSearchText(countryQuery);
     if (!query) return countries;
     return countries.filter((country) => {
-      const searchable = normalizeSearchText(`${country.label} ${country.value}`);
+      const arName = countryNameAr(country.value);
+      const searchable = normalizeSearchText(`${country.label} ${country.value} ${arName}`);
       return searchable.includes(query);
     });
   }, [countries, countryQuery]);
@@ -288,7 +290,7 @@ export default function HomeExperience({
               key={country.value}
               type="button"
               onClick={() => { onBrowseCountry(country); setSheet(null); }}
-              className="country-row group flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left transition-all duration-150 hover:border-cyan-300/22 hover:bg-cyan-300/[0.065] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40"
+              className="country-row group flex w-full items-center gap-3.5 rounded-xl border border-transparent px-3.5 py-3 text-left transition-all duration-200 hover:border-cyan-400/30 hover:bg-cyan-400/[0.08] hover:shadow-[0_4px_20px_rgba(34,211,238,0.05)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/40 active:scale-[0.98]"
             >
               <img
                 src={flagUrl(country.value, 40)}
@@ -296,7 +298,7 @@ export default function HomeExperience({
                 className="h-5 w-7 shrink-0 rounded-[3px] object-cover opacity-90 shadow-[0_1px_4px_rgba(0,0,0,0.5)] group-hover:opacity-100 transition-opacity"
                 loading="lazy"
               />
-              <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white/75 transition-colors group-hover:text-white">
+              <span className="min-w-0 flex-1 truncate text-[14px] font-medium text-white/80 transition-colors group-hover:text-white">
                 {country.label}
               </span>
               <span className="shrink-0 rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-bold tracking-wide text-cyan-200/55 transition-all group-hover:bg-cyan-300/[0.12] group-hover:text-cyan-200/85">
@@ -343,8 +345,8 @@ export default function HomeExperience({
         <button
           type="button"
           onClick={() => setCountryBrowserOpen((v) => !v)}
-          className={`pointer-events-auto absolute top-5 z-[70] flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-200/16 bg-[#07101f]/85 text-cyan-100/80 shadow-[0_0_24px_rgba(34,211,238,0.14)] backdrop-blur-xl transition-all duration-300 hover:border-cyan-200/34 hover:bg-cyan-300/10 hover:text-cyan-100 ${
-            countryBrowserOpen ? "right-[316px] xl:right-[352px]" : "right-4"
+          className={`pointer-events-auto absolute top-5 z-[70] flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-200/20 bg-[#07101f]/80 text-cyan-100/80 shadow-[0_0_24px_rgba(34,211,238,0.2)] backdrop-blur-xl transition-all duration-300 hover:border-cyan-200/40 hover:bg-cyan-300/15 hover:text-cyan-50 hover:scale-105 active:scale-95 ${
+            countryBrowserOpen ? "right-[356px] xl:right-[396px]" : "right-4"
           }`}
           aria-label={countryBrowserOpen ? "Close Country Browser" : "Open Country Browser"}
           title={countryBrowserOpen ? "Close Country Browser" : "Open Country Browser"}
@@ -364,7 +366,7 @@ export default function HomeExperience({
           </svg>
         </button>
 
-        <aside className={`cortex-hud-panel pointer-events-auto absolute bottom-0 right-0 top-0 flex w-[300px] xl:w-[336px] flex-col overflow-hidden rounded-l-2xl transition-transform duration-300 ${countryBrowserOpen ? "translate-x-0" : "translate-x-full"}`}>
+        <aside className={`cortex-hud-panel pointer-events-auto absolute bottom-0 right-0 top-0 flex w-[340px] xl:w-[380px] flex-col overflow-hidden rounded-l-2xl bg-gradient-to-b from-[#060d1a]/95 to-[#02050a]/95 border-l border-white/[0.05] shadow-[-10px_0_40px_rgba(0,0,0,0.6)] backdrop-blur-2xl transition-transform duration-400 ease-[cubic-bezier(0.16,1,0.3,1)] ${countryBrowserOpen ? "translate-x-0" : "translate-x-full"}`}>
 
           {/* ── Sticky header (does NOT scroll) ── */}
           <div className="shrink-0 px-4 pt-4 pb-0">
@@ -393,7 +395,7 @@ export default function HomeExperience({
                 autoComplete="off"
                 value={countryQuery}
                 onChange={(event) => setCountryQuery(event.target.value)}
-                placeholder="Search countriesâ€¦"
+                placeholder="Search countries..."
                 className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-white outline-none placeholder:text-white/28"
               />
               {countryQuery && (
@@ -456,7 +458,7 @@ export default function HomeExperience({
                     <input
                       value={countryQuery}
                       onChange={(event) => setCountryQuery(event.target.value)}
-                      placeholder="Search countriesâ€¦"
+                      placeholder="Search countries..."
                       className="min-w-0 flex-1 bg-transparent text-[13px] font-semibold text-white outline-none placeholder:text-white/34"
                     />
                   </div>

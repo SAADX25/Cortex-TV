@@ -1,4 +1,4 @@
-﻿import {
+import {
   CATEGORY_DEFS,
   categoryDisplayName,
   countryName,
@@ -285,9 +285,9 @@ function rebuildIndexes(): void {
   browseMetadata = {
     channelCount: allChannels.length,
     streamCount: indexedStreamCount,
-    countries: topOptionsFromMap(countryOptions, 80),
+    countries: topOptionsFromMap(countryOptions, 300),
     categories: buildCategoryOptions(),
-    languages: topOptionsFromMap(languageOptions, 40),
+    languages: topOptionsFromMap(languageOptions, 200),
   };
 }
 

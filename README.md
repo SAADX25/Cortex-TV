@@ -259,18 +259,6 @@ Cloudflare Worker (CORS Proxy)
    Globe → ChannelList → Player
 ```
 
----
-
-## 📋 Pre-Build Notes
-
-- **Icons**: Keep icons in `icons/` and `public/` in sync before every release.
-- **Static Assets**: The app expects its files to be available under `public/` and `assets/`.
-- **Android Studio**: Required to complete the Android build from the `android/` directory.
-- See `docs/ARCHITECTURE.md` for detailed architecture documentation.
-- See `docs/SECURITY.md` for Electron security and provider guidelines.
-
----
-
 ## ⚠️ Legal Disclaimer
 
 Cortex TV is designed exclusively for legal public streams and user-owned playlists.  
