@@ -370,13 +370,7 @@ export default function HomeExperience({
 
           {/* ── Sticky header (does NOT scroll) ── */}
           <div className="shrink-0 px-4 pt-4 pb-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.28em] text-cyan-300/48">
-              Country Browser
-            </p>
-            <div className="mt-1.5 flex items-center justify-between gap-2">
-              <h2 className="text-[17px] font-extrabold leading-tight text-white">
-                Select a Country
-              </h2>
+            <div className="flex items-center justify-end">
               <button
                 type="button"
                 onClick={onRetry}

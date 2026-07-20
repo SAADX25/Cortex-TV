@@ -158,36 +158,37 @@ export default function LeftSidebar({
 }: LeftSidebarProps) {
   return (
     <>
-      {/* ── Collapse toggle button ── */}
-      <button
-        type="button"
-        onClick={onToggleCollapsed}
-        className={`absolute top-5 z-[70] hidden h-10 w-10 items-center justify-center rounded-xl border border-cyan-200/16 bg-[#07101f]/85 text-cyan-100/80 shadow-[0_0_24px_rgba(34,211,238,0.14)] backdrop-blur-xl transition-all duration-300 hover:border-cyan-200/34 hover:bg-cyan-300/10 hover:text-cyan-100 md:flex ${collapsed ? "left-4" : "left-[14.5rem]"}`}
-        aria-label={collapsed ? "Open navigation" : "Close navigation"}
-        title={collapsed ? "Open navigation" : "Close navigation"}
-      >
-        <PanelToggleIcon open={!collapsed} />
-      </button>
+      {/* ── Fixed Logo & Collapse toggle button ── */}
+      <div className="absolute top-0 left-0 z-[70] hidden md:flex w-56 items-center justify-between border-b border-cyan-800/30 bg-gradient-to-r from-[#060d1a]/95 to-[#02050a]/95 px-4 py-3 backdrop-blur-2xl">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-300/30 bg-cyan-400/[0.15] text-lg font-black text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,0.2)]">
+            C
+          </div>
+          <div className="min-w-0">
+            <p className="truncate text-[14px] font-black uppercase tracking-[0.18em] text-white leading-tight">Cortex TV</p>
+            <p className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.25em] text-cyan-300/60 leading-tight">Global IPTV</p>
+          </div>
+        </div>
+
+        {/* Toggle Button */}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-200/20 bg-white/[0.05] text-cyan-100/80 transition-all hover:bg-cyan-300/15 hover:text-cyan-100"
+          aria-label={collapsed ? "Open navigation" : "Close navigation"}
+          title={collapsed ? "Open navigation" : "Close navigation"}
+        >
+          <PanelToggleIcon open={!collapsed} />
+        </button>
+      </div>
 
       {/* ── Sidebar panel ── */}
       <aside
+        style={{ paddingTop: '76px' }}
         className={`cortex-hud-panel absolute bottom-0 left-0 top-0 z-50 hidden w-56 flex-col overflow-hidden rounded-r-2xl transition-transform duration-300 ease-out md:flex ${
           collapsed ? "-translate-x-[14rem]" : "translate-x-0"
         }`}
       >
-        {/* Logo / brand */}
-        <div className="shrink-0 px-3 pt-4 pb-3">
-          <div className="flex items-center gap-3 px-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/[0.10] text-base font-black text-cyan-200 shadow-[0_0_18px_rgba(34,211,238,0.14)]">
-              C
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-[13px] font-black uppercase tracking-[0.16em] text-white">Cortex TV</p>
-              <p className="mt-0.5 truncate text-[9px] font-semibold uppercase tracking-[0.2em] text-cyan-300/40">Global IPTV</p>
-            </div>
-          </div>
-          <div className="mt-3 h-px bg-gradient-to-r from-transparent via-cyan-300/12 to-transparent" />
-        </div>
 
         {/* START section */}
         <SidebarSection title="Start">
