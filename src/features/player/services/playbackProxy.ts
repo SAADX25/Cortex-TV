@@ -1,147 +1,67 @@
 import Hls from "hls.js";
+import type { HlsConfig, LoaderCallbacks, LoaderConfiguration, LoaderContext } from "hls.js";
 import { isElectronPlatform, isNativePlatform } from "@/shared/lib/platformAdapter";
 
 export const IS_ELECTRON = isElectronPlatform();
 export const IS_NATIVE = isNativePlatform();
-export const IS_PROD_BROWSER =
-  !IS_ELECTRON &&
-  !IS_NATIVE &&
-  typeof window !== "undefined" &&
-  !/localhost|127\.0\.0\.1/.test(window.location.hostname);
-
-export const PROXY_RULES: Array<{ match: RegExp; prefix: string; strip: string }> = [
-  { match: /https?:\/\/rotana\.hibridcdn\.net/i, prefix: "/proxy/rotana", strip: "rotana.hibridcdn.net" },
-  { match: /https?:\/\/mbc\.dbrsp\.net/i, prefix: "/proxy/mbc", strip: "mbc.dbrsp.net" },
-];
-
 export const PROXY_ENDPOINTS = [
   "https://cortextv-proxy.cortextv-sr.workers.dev/?url=",
   "https://cortex-proxy-2.cortextv-sr.workers.dev/?url=",
 ];
-
-let customProxyUrl: string | null = null;
-const proxyCooldowns: Record<string, number> = {};
-const COOLDOWN_MS = 30000;
-
-export function setCustomProxyUrl(url: string | null) {
-  customProxyUrl = url;
-}
-
-export function getActiveProxyUrl(): string {
-  if (customProxyUrl) return customProxyUrl;
-  const now = Date.now();
-  for (const endpoint of PROXY_ENDPOINTS) {
-    if (!proxyCooldowns[endpoint] || now > proxyCooldowns[endpoint]) {
-      return endpoint;
-    }
-  }
-  return PROXY_ENDPOINTS[0];
-}
-
-export function markProxyFailed(url: string) {
-  proxyCooldowns[url] = Date.now() + COOLDOWN_MS;
-  console.warn(`[Proxy] Marked ${url} as failed. Cooldown for ${COOLDOWN_MS}ms.`);
-}
-
-const PROXY_CDN_FRAGMENTS = [
-  "hibridcdn.net",
-  "dbrsp.net",
-  "cloudfront.net",
+const failedUntil = new Map<string, number>();
+const RULES = [
+  { host: "rotana.hibridcdn.net", prefix: "/proxy/rotana" },
+  { host: "mbc.dbrsp.net", prefix: "/proxy/mbc" },
 ];
 
-export function needsCloudProxy(url: string): boolean {
-  if (!url || url.startsWith("data:") || url.startsWith("blob:")) return false;
-  if (url.includes("cortextv-proxy") && url.includes("workers.dev")) return false;
+function endpoint(custom?: string) {
+  if (custom && /^https?:\/\//i.test(custom)) return custom;
+  return PROXY_ENDPOINTS.find((url) => (failedUntil.get(url) ?? 0) < Date.now()) ?? PROXY_ENDPOINTS[0];
+}
+
+export function proxyRewrite(source: string, custom?: string): string {
+  if (IS_ELECTRON) return source;
   try {
-    const hostname = new URL(url).hostname.toLowerCase();
-    return PROXY_CDN_FRAGMENTS.some((fragment) => hostname.includes(fragment));
-  } catch {
-    return false;
-  }
+    const url = new URL(source);
+    if (!/^https?:$/.test(url.protocol)) return source;
+    if ([...PROXY_ENDPOINTS, custom].some((prefix) => prefix && source.startsWith(prefix))) return source;
+    const localDev = !IS_NATIVE && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+    const rule = RULES.find((item) => item.host === url.hostname);
+    if (localDev && rule && !custom) return window.location.origin + rule.prefix + url.pathname + url.search;
+    const mixedContent = window.location.protocol === "https:" && url.protocol === "http:";
+    const needsProxy = /(^|\.)(hibridcdn\.net|dbrsp\.net|cloudfront\.net)$/.test(url.hostname);
+    if (custom || mixedContent || needsProxy) return endpoint(custom) + encodeURIComponent(source);
+  } catch { /* The playback engine reports malformed sources. */ }
+  return source;
 }
 
-export function matchesProxyRule(url: string): boolean {
-  return PROXY_RULES.some((rule) => rule.match.test(url));
-}
-
-export function isSegmentUrl(url: string): boolean {
-  try {
-    const path = new URL(url).pathname;
-    return /\.(ts|aac|mp4|m4s|fmp4|cmfv|cmfa|vtt|webvtt)(\?.*)?$/i.test(path);
-  } catch {
-    return false;
-  }
-}
-
-export function proxyRewrite(url: string): string {
-  if (IS_ELECTRON) return url;
-
-  if (IS_NATIVE || IS_PROD_BROWSER) {
-    if (needsCloudProxy(url)) {
-      const proxied = getActiveProxyUrl() + encodeURIComponent(url);
-      console.log(`[Player] Cloud proxy: ${url} -> ${proxied}`);
-      return proxied;
-    }
-    return url;
-  }
-
-  for (const rule of PROXY_RULES) {
-    if (rule.match.test(url)) {
-      const absolute = window.location.origin + rule.prefix;
-      const rewritten = url.replace(new RegExp(`https?://${rule.strip}`, "i"), absolute);
-      console.log(`[Player] Vite proxy: ${url} -> ${rewritten}`);
-      return rewritten;
-    }
-  }
-
-  return url;
-}
-
-export function createNativeProxyLoader(debugFn?: (msg: string) => void) {
-  const DefaultLoader = Hls.DefaultConfig.loader;
-
-  return class NativeProxyLoader extends DefaultLoader {
-    load(context: any, config: any, callbacks: any) {
-      let cdnUrl: string = context.url;
-
-      let unwrapped = false;
-      if (customProxyUrl && cdnUrl.startsWith(customProxyUrl)) {
-        try {
-          cdnUrl = decodeURIComponent(cdnUrl.slice(customProxyUrl.length));
-          unwrapped = true;
-        } catch {}
-      } else {
-        for (const endpoint of PROXY_ENDPOINTS) {
-          if (cdnUrl.startsWith(endpoint)) {
-            try {
-              cdnUrl = decodeURIComponent(cdnUrl.slice(endpoint.length));
-              unwrapped = true;
-            } catch {}
-            break;
-          }
+/** Rewrite every playlist, key and segment; preserve the CDN base for relative URIs. */
+export function createPlaybackLoader(custom?: string): HlsConfig["loader"] {
+  const BaseLoader = Hls.DefaultConfig.loader;
+  return class PlaybackLoader extends BaseLoader {
+    load(context: LoaderContext, config: LoaderConfiguration, callbacks: LoaderCallbacks<LoaderContext>) {
+      let original = context.url;
+      for (const prefix of [...PROXY_ENDPOINTS, custom]) {
+        if (prefix && original.startsWith(prefix)) {
+          try { original = decodeURIComponent(original.slice(prefix.length)); } catch { /* retain URL */ }
+          break;
         }
       }
-      if (unwrapped) debugFn?.(`Unwrapped proxy -> ${cdnUrl.substring(0, 90)}`);
-
-      const realCdnUrl = cdnUrl;
-
-      if (needsCloudProxy(cdnUrl) && !isSegmentUrl(cdnUrl)) {
-        context.url = getActiveProxyUrl() + encodeURIComponent(cdnUrl);
-        debugFn?.(`Proxy load: ${cdnUrl.substring(0, 70)}`);
-      }
-
-      const originalOnSuccess = callbacks.onSuccess;
-      callbacks.onSuccess = (
-        response: any,
-        stats: any,
-        ctx: any,
-        networkDetails: any,
-      ) => {
-        response.url = realCdnUrl;
-        originalOnSuccess(response, stats, ctx, networkDetails);
-      };
-
-      super.load(context, config, callbacks);
+      const requested = proxyRewrite(original, custom);
+      context.url = requested;
+      super.load(context, config, {
+        ...callbacks,
+        onSuccess: (response, stats, ctx, details) => {
+          // Direct requests retain their final redirected URL. Proxy URLs are transport only.
+          if (requested !== original) response.url = original;
+          callbacks.onSuccess(response, stats, ctx, details);
+        },
+        onError: (error, ctx, details, stats) => {
+          const proxy = PROXY_ENDPOINTS.find((prefix) => requested.startsWith(prefix));
+          if (proxy) failedUntil.set(proxy, Date.now() + 30000);
+          callbacks.onError(error, ctx, details, stats);
+        },
+      });
     }
   };
 }

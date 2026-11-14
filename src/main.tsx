@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import App from "@/app/App";
 import { configureNativeSystemBars } from "@/shared/lib/platformAdapter";
 import "./index.css";
+import "./classic-controls.css";
 
 configureNativeSystemBars();
 

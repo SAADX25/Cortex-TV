@@ -2,6 +2,7 @@ import {
   CATEGORY_DEFS,
   categoryDisplayName,
   countryName,
+  countryNameAr,
   getStreamHealth,
   isUsableStream,
   languageName,
@@ -90,6 +91,21 @@ const SEARCH_ALIASES: Record<string, string[]> = {
   usa: ["us", "usa", "united states", "america"],
   us: ["us", "usa", "united states", "america"],
   uae: ["ae", "uae", "united arab emirates"],
+  ksa: ["sa", "ksa", "saudi arabia"],
+  اخبار: ["اخبار", "news", "الاخبار"],
+  الاخبار: ["الاخبار", "اخبار", "news"],
+  رياضه: ["رياضه", "sports", "sport"],
+  افلام: ["افلام", "movies", "cinema", "film"],
+  موسيقي: ["موسيقي", "music"],
+  اطفال: ["اطفال", "kids", "children"],
+  وثائقي: ["وثائقي", "documentary"],
+  ديني: ["ديني", "religious", "islam", "quran"],
+  قران: ["قران", "religious", "islam", "quran"],
+  اقتصاد: ["اقتصاد", "business", "finance", "economy"],
+  امريكا: ["us", "united states", "america"],
+  بريطانيا: ["gb", "uk", "united kingdom"],
+  الامارات: ["ae", "united arab emirates", "uae"],
+  السعوديه: ["sa", "saudi arabia", "ksa"],
 };
 
 const PRIORITY_COUNTRIES = new Set([
@@ -115,6 +131,7 @@ interface SearchEntry {
   altNames: string[];
   countryCode: string;
   country: string;
+  countryAr: string;
   categories: string[];
   languages: string[];
 }
@@ -188,6 +205,7 @@ function buildSearchEntry(channel: ChannelWithStream): SearchEntry {
   const altNames = (channel.altNames ?? []).map(normalizeChannelNameForSearch).filter(Boolean);
   const countryLabel = normalizeSearchText(channel.countryName ?? countryName(channel.country));
   const countryCode = normalizeSearchText(channel.country);
+  const countryAr = normalizeSearchText(countryNameAr(channel.country));
   const categories = channel.categories.map((cat) => normalizeSearchText(categoryDisplayName(cat)));
   const languages = [
     ...channel.languages.map(normalizeSearchText),
@@ -201,6 +219,7 @@ function buildSearchEntry(channel: ChannelWithStream): SearchEntry {
     altNames,
     countryCode,
     country: countryLabel,
+    countryAr,
     categories,
     languages,
   };
@@ -401,8 +420,8 @@ function bestTextScore(entry: SearchEntry, query: string, terms: string[]): numb
     else if (entry.altNames.some((name) => name.startsWith(q))) score = Math.max(score, 590);
     else if (entry.altNames.some((name) => name.includes(q))) score = Math.max(score, 540);
 
-    if (entry.countryCode === q || entry.country === q) score = Math.max(score, 470);
-    else if (entry.country.startsWith(q)) score = Math.max(score, 420);
+    if (entry.countryCode === q || entry.country === q || (entry.countryAr && entry.countryAr === q)) score = Math.max(score, 470);
+    else if (entry.country.startsWith(q) || (entry.countryAr && entry.countryAr.includes(q))) score = Math.max(score, 420);
 
     if (entry.categories.some((cat) => cat === q)) score = Math.max(score, 380);
     else if (entry.categories.some((cat) => cat.includes(q))) score = Math.max(score, 330);
@@ -420,7 +439,7 @@ function bestTextScore(entry: SearchEntry, query: string, terms: string[]): numb
       } else if (entry.altNames.some((name) => name.includes(term))) {
         termScore += 70;
         matchedTerms += 1;
-      } else if (entry.country.includes(term) || entry.countryCode.includes(term)) {
+      } else if (entry.country.includes(term) || entry.countryCode.includes(term) || (entry.countryAr && entry.countryAr.includes(term))) {
         termScore += 48;
         matchedTerms += 1;
       } else if (entry.categories.some((cat) => cat.includes(term))) {
@@ -470,7 +489,8 @@ function handleSearch(
   favoriteIdsRaw: string[],
   recentIdsRaw: string[],
 ): WorkerResponse {
-  const normalizedQuery = normalizeChannelNameForSearch(query);
+  const rawQuery = normalizeSearchText(query);
+  const normalizedQuery = normalizeChannelNameForSearch(query) || rawQuery;
   const terms = normalizedQuery.split(" ").filter(Boolean);
   const favoriteIds = new Set(favoriteIdsRaw);
   const recentIds = new Set(recentIdsRaw);

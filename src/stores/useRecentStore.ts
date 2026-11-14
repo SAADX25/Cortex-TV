@@ -41,5 +41,5 @@ export const useRecentStore = create<RecentState>((set) => ({
 }));
 
 useRecentStore.subscribe((state) => {
-  localStorage.setItem(RECENTS_KEY, JSON.stringify(state.recentChannels));
+  try { localStorage.setItem(RECENTS_KEY, JSON.stringify(state.recentChannels)); } catch { /* Keep playback usable without persistence. */ }
 });

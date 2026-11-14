@@ -10,8 +10,6 @@ export interface PlayerProps {
   favorites?: ChannelWithStream[];
   onToggleFavorite?: (ch: ChannelWithStream) => void;
   onPlayChannel?: (ch: ChannelWithStream) => void;
-  onBack?: () => void;
   customProxyUrl?: string;
+  onBack?: () => void;
 }
-
-export type StreamStatus = "loading" | "playing" | "error";

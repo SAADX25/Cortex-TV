@@ -7,15 +7,12 @@ import path from "node:path";
 
 const isGitHubPages = process.env.GITHUB_PAGES === "true";
 const isCustomDomain = process.env.CUSTOM_DOMAIN === "true";
+const isWebOnly = process.env.WEB_ONLY === "true" || isGitHubPages || isCustomDomain;
 
 export default defineConfig({
-  base: isCustomDomain ? "/" : isGitHubPages ? "/Cortex-TV/" : "/",
+  base: isCustomDomain ? "/" : isGitHubPages ? "/Cortex-TV/" : "./",
   server: {
     middlewareMode: false,
-    hmr: {
-      host: "localhost",
-      port: 5173,
-    },
     proxy: {
       /* ── Rotana / LBC (hibridcdn) proxy ── */
       "/proxy/rotana": {
@@ -68,7 +65,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    electron([
+    ...(!isWebOnly ? [electron([
       {
         // ── Main process ──
         entry: "electron/main.ts",
@@ -82,7 +79,7 @@ export default defineConfig({
         },
       },
     ]),
-    renderer(),
+    renderer()] : []),
   ],
   assetsInclude: ["**/*.glb", "**/*.gltf"],
   resolve: {

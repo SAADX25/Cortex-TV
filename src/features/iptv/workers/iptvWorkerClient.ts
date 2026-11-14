@@ -70,6 +70,16 @@ function getWorker(): Worker {
     worker.onmessage = handleWorkerMessage;
     worker.onerror = (e) => {
       console.error("[WorkerClient] Worker error:", e.message);
+      const error = new Error(e.message || "Channel worker failed");
+      initRejectFn?.(error);
+      initRejectFn = null;
+      initResolveFn = null;
+      for (const request of pending.values()) request.reject(error);
+      pending.clear();
+      worker?.terminate();
+      worker = null;
+      initResolved = false;
+      initPromise = null;
       emitStatus({
         phase: "error",
         message: "Worker failed while preparing channel data",

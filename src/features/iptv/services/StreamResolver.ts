@@ -18,10 +18,15 @@ const RESOLVE_DOMAINS = [
  * Simulate an API call that returns a short-lived playback token.
  * In production this would hit a real auth endpoint.
  */
-async function fetchPlaybackToken(host: string): Promise<string> {
+async function fetchPlaybackToken(host: string, signal?: AbortSignal): Promise<string> {
   /* Simulate network latency (400 – 900 ms) */
   const latency = 400 + Math.random() * 500;
-  await new Promise((r) => setTimeout(r, latency));
+  await new Promise<void>((resolve, reject) => {
+    signal?.throwIfAborted();
+    const onAbort = () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", onAbort); resolve(); }, latency);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 
   /* Generate a mock JWT-like token */
   const randomPart = Array.from(crypto.getRandomValues(new Uint8Array(16)))
@@ -59,8 +64,10 @@ function needsResolving(url: string): boolean {
  * @returns A playable stream URL (possibly with an appended token).
  */
 export const resolveStream = async (
-  originalUrl: string
+  originalUrl: string,
+  signal?: AbortSignal,
 ): Promise<string> => {
+  signal?.throwIfAborted();
   if (!needsResolving(originalUrl)) {
     return originalUrl;
   }
@@ -81,7 +88,7 @@ export const resolveStream = async (
   }
 
   /* Fetch a time-limited token from the (mock) auth API */
-  const token = await fetchPlaybackToken(host);
+  const token = await fetchPlaybackToken(host, signal);
 
   /* Append the token as a query parameter */
   const separator = targetUrl.includes("?") ? "&" : "?";

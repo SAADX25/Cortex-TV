@@ -39,6 +39,8 @@ function loadSettings(): GlobeSettings {
 }
 
 interface UIState {
+  language: "en" | "ar";
+  toggleLanguage: () => void;
   activeTab: ActiveTab;
   selectedCountry: CountryInfo | null;
   focusCountryIso: string | null;
@@ -59,6 +61,12 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
+  language: (() => { try { return localStorage.getItem("cortex_language") === "ar" ? "ar" : "en"; } catch { return "en"; } })(),
+  toggleLanguage: () => set((state) => {
+    const language = state.language === "ar" ? "en" : "ar";
+    try { localStorage.setItem("cortex_language", language); } catch { /* storage is optional */ }
+    return { language };
+  }),
   activeTab: "globe",
   selectedCountry: null,
   focusCountryIso: null,
@@ -76,7 +84,7 @@ export const useUIStore = create<UIState>((set) => ({
   setSplashVisible: (v) => set({ splashVisible: v }),
 
   setGlobeSettings: (s) => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { /* Session settings still work. */ }
     set({ globeSettings: s });
   },
 

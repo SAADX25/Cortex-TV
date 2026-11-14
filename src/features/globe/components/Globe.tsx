@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, useCallback, useMemo, memo } from "react";
 import GlobeGL from "react-globe.gl";
 import * as THREE from "three";
 import Crosshair from "./Crosshair";
+import SafeImage from "@/shared/components/SafeImage";
 import { flagUrl } from "@/shared/lib/channelUtils";
 import { COUNTRY_TZ, COUNTRY_CAPITAL, A3_TO_A2, ADMIN_TO_A2 } from "../data/geoData";
 import { getCachedGeoJson, setCachedGeoJson } from "../data/geoJsonCache";
@@ -174,7 +175,7 @@ const CountryInfoBadge = memo(function CountryInfoBadge({
         <div className="flex flex-col items-center gap-1.5">
           <div className="flex items-center gap-2.5">
             {hasIso ? (
-              <img
+              <SafeImage
                 src={flagUrl(targetedCountry.iso)}
                 alt=""
                 width={24}

@@ -29,7 +29,9 @@ export const FLAG_CODE_MAP: Record<string, string> = {
 export function flagUrl(iso: string, width: 20 | 40 | 80 = 40): string {
   void width;
   const code = iso.toLowerCase();
-  return `icons/classic_3_ico/classic_3_ico/${FLAG_CODE_MAP[code] ?? code}.ico`;
+  if (!/^[a-z]{2}$/.test(code)) return `${import.meta.env.BASE_URL}icons/flag-placeholder.svg`;
+  const name = FLAG_CODE_MAP[code] ?? code;
+  return `${import.meta.env.BASE_URL}icons/flags/${name}.ico`;
 }
 
 /**
@@ -57,13 +59,17 @@ export const SEARCH_NOISE_WORDS = new Set([
 
 /**
  * Normalize free text for search and ranking.
- * Keeps words/numbers, removes symbols, folds whitespace, and lowercases.
+ * Keeps words/numbers, folds Arabic variants & diacritics, removes symbols, folds whitespace, and lowercases.
  */
 export function normalizeSearchText(value: string): string {
   return value
     .toLowerCase()
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+    .replace(/[أإآٱ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
     .replace(/&/g, " and ")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim()
@@ -117,6 +123,34 @@ const COUNTRY_NAME_OVERRIDES: Record<string, string> = {
   UK: "United Kingdom",
   XK: "Kosovo",
 };
+
+const COUNTRY_SEARCH_ALIASES: Record<string, string[]> = {
+  US: ["usa", "america", "امريكا", "الولايات المتحده"],
+  GB: ["uk", "britain", "england", "بريطانيا", "المملكه المتحده"],
+  UK: ["gb", "britain", "england", "بريطانيا", "المملكه المتحده"],
+  AE: ["uae", "emirates", "الامارات"],
+  SA: ["ksa", "saudi", "السعوديه"],
+  JO: ["jordan", "الاردن"],
+  EG: ["egypt", "مصر"],
+  QA: ["qatar", "قطر"],
+  KW: ["kuwait", "الكويت"],
+  LB: ["lebanon", "لبنان"],
+  SY: ["syria", "سوريا", "سوريه"],
+  PS: ["palestine", "فلسطين"],
+  IQ: ["iraq", "العراق"],
+  MA: ["morocco", "المغرب"],
+  DZ: ["algeria", "الجزائر"],
+  TN: ["tunisia", "تونس"],
+  TR: ["turkey", "turkiye", "تركيا"],
+};
+
+export function countrySearchText(iso: string | null | undefined, label?: string | null): string {
+  const code = (iso ?? "").toUpperCase();
+  const en = label || countryName(code);
+  const ar = countryNameAr(code);
+  const aliases = COUNTRY_SEARCH_ALIASES[code] ?? [];
+  return normalizeSearchText([en, code, ar, ...aliases].filter(Boolean).join(" "));
+}
 
 export function countryNameAr(iso: string | null | undefined): string {
   if (!iso) return "";

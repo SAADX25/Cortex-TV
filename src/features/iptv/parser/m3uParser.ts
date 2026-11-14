@@ -22,9 +22,10 @@ function isNsfwGroup(group: string): boolean {
  * ChannelWithStream[] compatible with the rest of the app.
  */
 export async function fetchAndParseM3U(
-  url: string
+  url: string,
+  signal?: AbortSignal,
 ): Promise<ChannelWithStream[]> {
-  const res = await fetch(url);
+  const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`M3U fetch failed: HTTP ${res.status}`);
   const text = await res.text();
   return parseM3U(text);

@@ -7,7 +7,7 @@ interface SettingCardProps {
 
 export function SettingCard({ children, className = "" }: SettingCardProps) {
   return (
-    <div className={`overflow-hidden rounded-xl border border-white/[0.06] bg-white/[0.03] p-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] ${className}`}>
+    <div className={`overflow-hidden rounded-xl border border-blue-400/20 bg-gradient-to-b from-[#0d2148]/75 to-[#07142e]/85 p-2 shadow-[inset_0_1px_0_rgba(191,219,254,0.08),0_4px_16px_rgba(2,8,24,0.3)] ${className}`}>
       {children}
     </div>
   );

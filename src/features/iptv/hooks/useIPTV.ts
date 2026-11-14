@@ -77,12 +77,13 @@ function fetchCountryFallback(
   abortRef: MutableRefObject<number>,
   setChannels: Dispatch<SetStateAction<ChannelWithStream[]>>,
   setLoading: Dispatch<SetStateAction<boolean>>,
+  signal: AbortSignal,
 ) {
   const code = isoCode.toLowerCase();
   const url = `https://iptv-org.github.io/api/countries/${code}.json`;
   console.log(`[IPTV] Trying country endpoint fallback: ${url}`);
 
-  fetch(url)
+  fetch(url, { signal })
     .then(async (res) => {
       if (!res.ok) throw new Error(`Country endpoint ${code}: HTTP ${res.status}`);
       const raw: any[] = await res.json();
@@ -112,13 +113,16 @@ export function useIPTV(countryIso: string | null): UseIPTVReturn {
   const abortRef = useRef(0);
 
   useEffect(() => {
+    const token = ++abortRef.current;
+    const controller = new AbortController();
     if (!countryIso) {
       setChannels([]);
       setError(null);
+      setLoading(false);
       return;
     }
 
-    const token = ++abortRef.current;
+    setChannels([]);
     setLoading(true);
     setError(null);
 
@@ -138,7 +142,7 @@ export function useIPTV(countryIso: string | null): UseIPTVReturn {
             ISO_CANONICAL[upper] ??
             (byName ? ISO_CANONICAL[byName] ?? byName.toLowerCase() : null) ??
             countryIso.toLowerCase();
-          fetchCountryFallback(canonical, token, abortRef, setChannels, setLoading);
+          fetchCountryFallback(canonical, token, abortRef, setChannels, setLoading, controller.signal);
           return;
         }
 
@@ -154,6 +158,7 @@ export function useIPTV(countryIso: string | null): UseIPTVReturn {
         setError(err.message ?? "Failed to load channels");
         setLoading(false);
       });
+    return () => { ++abortRef.current; controller.abort(); };
   }, [countryIso]);
 
   return { channels, loading, error };

@@ -21,7 +21,7 @@ export function SegmentedControl<T extends string | number>({
   className = "",
 }: SegmentedControlProps<T>) {
   return (
-    <div className={`grid gap-[3px] ${className}`} style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
+    <div className={`grid gap-1 rounded-lg bg-[#050f24]/80 p-1 border border-blue-400/10 ${className}`} style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }}>
       {options.map((option) => {
         const isActive = option.value === value;
         return (
@@ -33,12 +33,12 @@ export function SegmentedControl<T extends string | number>({
             onClick={() => onChange(option.value)}
             title={option.tooltip}
             className={[
-              "h-8 rounded-lg text-[11px] font-bold transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-400 focus-visible:outline-offset-1 flex items-center justify-center min-w-0 px-1",
+              "h-8 rounded-md text-[11px] font-bold transition-all duration-150 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 focus-visible:outline-offset-1 flex items-center justify-center min-w-0 px-1.5",
               isActive
-                ? "bg-gradient-to-b from-cyan-400 to-cyan-500 text-slate-950 shadow-[0_0_14px_rgba(34,211,238,0.30)]"
+                ? "bg-gradient-to-b from-blue-500 to-blue-600 text-white border border-sky-300/35 shadow-[0_4px_14px_rgba(37,99,235,0.45),inset_0_1px_0_rgba(255,255,255,0.2)]"
                 : option.disabled
-                ? "text-white/20 cursor-not-allowed"
-                : "text-white/55 hover:bg-white/[0.06] hover:text-white/80 active:scale-[0.97]",
+                ? "text-blue-200/25 cursor-not-allowed"
+                : "text-blue-100/70 hover:bg-blue-500/15 hover:text-white active:scale-[0.97]",
             ].join(" ")}
           >
             <span className="truncate">{option.label}</span>

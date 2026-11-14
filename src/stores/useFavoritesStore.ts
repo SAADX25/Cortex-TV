@@ -56,5 +56,5 @@ export const useFavoritesStore = create<FavoritesState>((set) => ({
 
 /* ── Auto-persist to localStorage on every change ── */
 useFavoritesStore.subscribe((state) => {
-  localStorage.setItem(FAVORITES_KEY, JSON.stringify(state.favorites));
+  try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(state.favorites)); } catch { /* Storage may be full or disabled. */ }
 });
