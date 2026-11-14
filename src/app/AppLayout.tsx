@@ -353,13 +353,12 @@ export default function AppLayout() {
         />
       </div>
 
-      {/* Clickable backdrop to close active panels when clicking on the globe/middle area */}
-      {!playingChannel && (activeTab !== 'globe' || selectedCountry || isPlaylistMode) && (
+      {/* Clickable backdrop to close non-globe drawers when clicking on the middle area */}
+      {!playingChannel && (activeTab !== 'globe' || isPlaylistMode) && (
         <div
           className="absolute inset-0 z-10 cursor-pointer"
           onClick={() => {
             if (activeTab !== 'globe') setActiveTab('globe');
-            if (selectedCountry) selectCountry(null);
             if (isPlaylistMode && activeTab === 'globe') setPlaylistConfig((p) => ({ ...p, enabled: false }));
           }}
           aria-label="Return to globe"

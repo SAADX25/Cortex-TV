@@ -299,6 +299,8 @@ function GlobeInner({
   const rendererConfig = useMemo(() => ({
     antialias: highQualityGraphics,
     alpha: true,
+    // Keep the last composited frame intact while animation pauses so Chromium never flashes black.
+    preserveDrawingBuffer: true,
     powerPreference: (highQualityGraphics ? "high-performance" : "low-power") as WebGLPowerPreference,
   }), [highQualityGraphics]);
   /* ------ Sniper-mode state ------ */
@@ -397,9 +399,6 @@ function GlobeInner({
     controls.minDistance = 150;
     controls.maxDistance = 500;
 
-    // Pixel ratio is set in the paused effect
-    globe.renderer?.()?.setPixelRatio(1);
-
     // Slight initial tilt for a nicer default view
     globe.pointOfView({ lat: 20, lng: 0, altitude: 2.5 }, 0);
   }, []);
@@ -464,6 +463,17 @@ function GlobeInner({
   const wakeUntilRef = useRef(Date.now() + 3500);
   const isAwakeRef = useRef(true);
   const [focusMarker, setFocusMarker] = useState<(CountryFocusTarget & { name: string }) | null>(null);
+  const updateFocusMarker = useCallback((target: CountryFocusTarget, name: string) => {
+    setFocusMarker((prev) =>
+      prev &&
+      prev.iso === target.iso &&
+      prev.name === name &&
+      Math.abs(prev.lat - target.lat) < 0.01 &&
+      Math.abs(prev.lng - target.lng) < 0.01
+        ? prev
+        : { ...target, name }
+    );
+  }, []);
   const [ringBurstActive, setRingBurstActive] = useState(false);
   const lastExecutedFocusRef = useRef<string | null>(null);
   const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -493,7 +503,7 @@ function GlobeInner({
     if (!paused) {
       wakeGlobeFor(900);
     }
-  }, [paused, isNightMode, globeFps, highQualityGraphics, dimensions, wakeGlobeFor]);
+  }, [paused, isNightMode, globeFps, highQualityGraphics, dimensions, countries.length, selectedCountryIso, wakeGlobeFor]);
 
   useEffect(() => {
     return () => {
@@ -555,6 +565,13 @@ function GlobeInner({
         return;
       }
 
+      // Keep rAF awake while three-render-objects holds scene.visible=false awaiting night-sky.png load
+      const scene = globe?.scene?.();
+      if (scene && scene.visible === false) {
+        wakeGlobeFor(900);
+        return;
+      }
+
       if (Date.now() >= wakeUntilRef.current && isAwakeRef.current) {
         isAwakeRef.current = false;
         globe?.pauseAnimation();
@@ -597,16 +614,8 @@ function GlobeInner({
       feature.properties?.name ||
       target.iso;
 
-    setFocusMarker((prev) =>
-      prev &&
-      prev.iso === target.iso &&
-      prev.name === resolvedName &&
-      Math.abs(prev.lat - target.lat) < 0.01 &&
-      Math.abs(prev.lng - target.lng) < 0.01
-        ? prev
-        : { ...target, name: resolvedName }
-    );
-  }, [selectedCountryIso, selectedCountryName, countries]);
+    updateFocusMarker(target, resolvedName);
+  }, [selectedCountryIso, selectedCountryName, countries, updateFocusMarker]);
 
   /* ------ Fly to country + sonar lock-on when focusCountryIso changes ------ */
   useEffect(() => {
@@ -655,7 +664,7 @@ function GlobeInner({
       feature.properties?.ADMIN ||
       feature.properties?.name ||
       target.iso;
-    setFocusMarker({ ...target, name: resolvedName });
+    updateFocusMarker(target, resolvedName);
 
     if (ringTimeoutRef.current) {
       clearTimeout(ringTimeoutRef.current);
@@ -676,7 +685,7 @@ function GlobeInner({
       { lat: target.lat, lng: target.lng, altitude: target.altitude },
       durationMs
     );
-  }, [focusCountryIso, focusTrigger, countries, paused, wakeGlobeFor]);
+  }, [focusCountryIso, focusTrigger, countries, paused, wakeGlobeFor, updateFocusMarker]);
 
   /* ------ Render Triggers for transitions ------ */
   useEffect(() => {
@@ -1216,6 +1225,7 @@ function GlobeInner({
         atmosphereColor={isNightMode ? "#0066cc" : "#00bfff"}
         atmosphereAltitude={atmosphereIntensity}
         animateIn={false}
+        waitForGlobeReady={false}
         onGlobeReady={handleGlobeReady}
         /* ------ Country polygons ------ */
         polygonsData={countries}

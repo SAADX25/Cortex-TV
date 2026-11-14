@@ -26,14 +26,12 @@
   padding: 5px 11px;
   border-radius: 9999px;
   white-space: nowrap;
-  background: linear-gradient(135deg, rgba(10, 26, 58, 0.94), rgba(15, 42, 92, 0.9));
+  background: linear-gradient(135deg, rgba(8, 22, 52, 0.96), rgba(15, 42, 92, 0.94));
   border: 1px solid rgba(96, 165, 250, 0.55);
   box-shadow:
     0 8px 24px rgba(3, 10, 28, 0.65),
     0 0 18px rgba(56, 189, 248, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .cortex-globe-pin-iso {
