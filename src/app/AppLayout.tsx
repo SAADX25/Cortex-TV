@@ -1,8 +1,6 @@
 /* AppLayout.tsx - Root application shell for Cortex TV
-   App.tsx - Root application shell for Cortex TV
    Full-screen 3D globe with transparent HUD overlay,
-   IPTV channel sidebar, and video player.
-   Core layout component for the entire application. */
+   IPTV channel sidebar, and video player. */
 
 import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import Scene from "@/features/globe/components/Scene";
@@ -26,7 +24,7 @@ import {
   type MetadataOption,
   type SearchFilters,
 } from "@/features/iptv/hooks/useIPTV";
-import { fetchAndParseM3U } from "@/features/iptv/services/playlistService";
+import { fetchAndParseM3U } from "@/features/iptv/parser/m3uParser";
 import { useUIStore } from "@/stores/useUIStore";
 import { usePlayerStore } from "@/stores/usePlayerStore";
 import { useFavoritesStore } from "@/stores/useFavoritesStore";
@@ -281,26 +279,8 @@ export default function AppLayout() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  /* ---- Handle playlist save from settings ---- */
+  /* ---- Active mode derived flags ---- */
   const isPlaylistMode = playlistConfig.enabled && playlistChannels.length > 0;
-  const mode = playingChannel
-    ? "Now Playing"
-    : activeTab === "favorites"
-      ? "Favorites"
-      : activeTab === "news"
-        ? "Quick News"
-        : isPlaylistMode
-          ? "Custom Playlist"
-          : selectedCountry
-            ? "Channel Browser"
-            : "Globe Mode";
-
-  /* ---- Handle tab navigation ---- */
-  const hasRightContent =
-    (selectedCountry && activeTab !== "favorites" && activeTab !== "news" && !isPlaylistMode) ||
-    (isPlaylistMode && activeTab !== "favorites" && activeTab !== "news") ||
-    activeTab === "favorites" ||
-    activeTab === "news";
 
   /* ---- Handle settings toggle ---- */
   // Globe stays visible when a country is selected; hides only when a video is playing (GPU savings)

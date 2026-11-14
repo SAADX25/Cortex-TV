@@ -6,7 +6,6 @@ import type {
   WorkerRequest,
   WorkerResponse,
 } from "../types";
-import { fingerprint, idbGet, idbSet } from "./idbCache";
 
 let worker: Worker | null = null;
 let initPromise: Promise<void> | null = null;

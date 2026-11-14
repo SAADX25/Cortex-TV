@@ -43,7 +43,10 @@ export default function Player({
   useEffect(() => {
     // Loading a country can finish after the player opens. Freeze the resulting guide
     // so updates to home recommendations or recent history don't reorder remote zapping.
-    if (sidebarLoading) { awaitingGuide.current = true; return; }
+    if (sidebarLoading) {
+      awaitingGuide.current = true;
+      return;
+    }
     if (awaitingGuide.current || !sessionChannels.length) {
       setSessionChannels(sidebarChannels);
       awaitingGuide.current = false;
@@ -64,7 +67,11 @@ export default function Player({
     setPlayback({ ...INITIAL_PLAYBACK });
     setDebug([]);
     if (!channel.streamUrl) {
-      setPlayback({ ...INITIAL_PLAYBACK, status: "error", error: "No stream URL is available for this channel." });
+      setPlayback({
+        ...INITIAL_PLAYBACK,
+        status: "error",
+        error: "No stream URL is available for this channel.",
+      });
       return;
     }
     const controller = new LivePlayback({
@@ -79,17 +86,26 @@ export default function Player({
     });
     engineRef.current = controller;
     void controller.start();
-    return () => { controller.dispose(); engineRef.current = null; };
+    return () => {
+      controller.dispose();
+      engineRef.current = null;
+    };
   }, [channel.id, channel.streamUrl, customProxyUrl, retry]);
 
   useEffect(() => {
-    if (videoRef.current) { videoRef.current.volume = volume; videoRef.current.muted = muted; }
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.muted = muted;
+    }
   }, [volume, muted, channel.id]);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const syncVolume = () => { setMuted(video.muted); setVolume(video.volume); };
+    const syncVolume = () => {
+      setMuted(video.muted);
+      setVolume(video.volume);
+    };
     video.addEventListener("volumechange", syncVolume);
     return () => video.removeEventListener("volumechange", syncVolume);
   }, []);
@@ -119,33 +135,61 @@ export default function Player({
 
   const fullscreen = useCallback(async () => {
     try {
-      if (document.fullscreenElement) await document.exitFullscreen();
-      else if (theatreRef.current?.requestFullscreen) await theatreRef.current.requestFullscreen();
-      else {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (theatreRef.current?.requestFullscreen) {
+        await theatreRef.current.requestFullscreen();
+      } else {
         const video = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
         video?.webkitEnterFullscreen?.();
       }
-    } catch { setNotice("Fullscreen is unavailable on this device."); }
+    } catch {
+      setNotice("Fullscreen is unavailable on this device.");
+    }
   }, []);
 
   const pip = async () => {
     try {
-      if (document.pictureInPictureElement) await document.exitPictureInPicture();
-      else await videoRef.current?.requestPictureInPicture();
-    } catch { setNotice(t("Picture in Picture is available once the stream is playing.", "تتوفر صورة داخل صورة بعد بدء البث.")); }
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      } else {
+        await videoRef.current?.requestPictureInPicture();
+      }
+    } catch {
+      setNotice(
+        t(
+          "Picture in Picture is available once the stream is playing.",
+          "تتوفر صورة داخل صورة بعد بدء البث.",
+        ),
+      );
+    }
   };
 
   const report = async () => {
     try {
-      await navigator.clipboard.writeText(["Cortex TV stream report", channel.name, channel.country, channel.streamUrl, playback.error, ...debug].join("\n"));
+      await navigator.clipboard.writeText(
+        [
+          "Cortex TV stream report",
+          channel.name,
+          channel.country,
+          channel.streamUrl,
+          playback.error,
+          ...debug,
+        ].join("\n"),
+      );
       setNotice(t("Stream report copied.", "تم نسخ تقرير البث."));
-    } catch { setNotice(t("Clipboard access is unavailable.", "تعذر الوصول إلى الحافظة.")); }
+    } catch {
+      setNotice(t("Clipboard access is unavailable.", "تعذر الوصول إلى الحافظة."));
+    }
   };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || target.closest("input,textarea,select,[contenteditable=true],[role=dialog]")) return;
+      const ignoreTarget = target.closest("input,textarea,select,[contenteditable=true],[role=dialog]");
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || ignoreTarget) {
+        return;
+      }
       const key = event.key.toLowerCase();
       if (key === " " && target.closest("button,[role=button]")) return;
       if (["arrowup", "arrowdown", "f", "m", " "].includes(key)) event.preventDefault();
@@ -240,9 +284,16 @@ export default function Player({
             onNextChannel={() => switchChannel(1)}
             onPlay={togglePlay}
             onMute={() => setMuted(!muted)}
-            onVolume={(value) => { setVolume(value); setMuted(value === 0); }}
+            onVolume={(value) => {
+              setVolume(value);
+              setMuted(value === 0);
+            }}
             onQuality={(index) => engineRef.current?.selectLevel(index)}
-            onAspect={() => setAspect((previous) => previous === "Fit" ? "Fill" : previous === "Fill" ? "16:9" : "Fit")}
+            onAspect={() =>
+              setAspect((previous) =>
+                previous === "Fit" ? "Fill" : previous === "Fill" ? "16:9" : "Fit",
+              )
+            }
             onPip={pip}
             onFullscreen={fullscreen}
           />

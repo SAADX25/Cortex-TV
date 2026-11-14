@@ -20,6 +20,19 @@ import {
   streamHealthLabel,
 } from "@/shared/lib/channelUtils";
 
+const CATEGORY_LABELS_AR: Record<string, string> = {
+  all: "الكل",
+  news: "أخبار",
+  sports: "رياضة",
+  movies: "أفلام",
+  music: "موسيقى",
+  entertainment: "ترفيه",
+  kids: "أطفال",
+  documentary: "وثائقي",
+  religious: "ديني",
+  business: "اقتصاد",
+};
+
 interface ChannelListProps {
   embedded?: boolean;
   countryName: string;
@@ -539,7 +552,7 @@ export default function ChannelList({
               className={(!filters.category && item.key === "all") || filters.category === item.key ? "active" : ""}
               onClick={() => setFilters((previous) => ({ ...previous, category: item.key === "all" ? null : item.key }))}
             >
-              {t(item.label, ({ all: "الكل", news: "أخبار", sports: "رياضة", movies: "أفلام", music: "موسيقى", entertainment: "ترفيه", kids: "أطفال", documentary: "وثائقي", religious: "ديني", business: "اقتصاد" } as Record<string, string>)[item.key] ?? item.label)}
+              {t(item.label, CATEGORY_LABELS_AR[item.key] ?? item.label)}
             </button>
           ))}
         </div>
