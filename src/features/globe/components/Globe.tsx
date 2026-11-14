@@ -20,11 +20,7 @@ import {
 } from "../utils/countryFocus";
 import "../styles/countryPin.css";
 import { getCachedGeoJson, setCachedGeoJson } from "../data/geoJsonCache";
-import {
-  resolvePixelRatio,
-  resolveTargetFps,
-  shouldRenderFrame,
-} from "../utils/globePerf";
+import { resolvePixelRatio } from "../utils/globePerf";
 
 /* ------ GeoJSON point-in-polygon (ray-casting) ------ */
 function pointInRing2D(
@@ -302,7 +298,7 @@ function GlobeInner({
 
   const rendererConfig = useMemo(() => ({
     antialias: highQualityGraphics,
-    alpha: false,
+    alpha: true,
     powerPreference: (highQualityGraphics ? "high-performance" : "low-power") as WebGLPowerPreference,
   }), [highQualityGraphics]);
   /* ------ Sniper-mode state ------ */
@@ -318,16 +314,8 @@ function GlobeInner({
   /* ------ Language toggle state ------ */
   const [uiLang, setUiLang] = useState<"en" | "ar">("en");
 
-  const forceRenderRef = useRef(true);
-  const lastRenderMsRef = useRef(0);
-  const highFpsUntilRef = useRef(performance.now() + 1800);
   const isPointerDraggingRef = useRef(false);
   const lastHoverCheckMsRef = useRef(0);
-  const origRenderRef = useRef<THREE.WebGLRenderer["render"] | null>(null);
-  const globeFpsRef = useRef(globeFps);
-  globeFpsRef.current = globeFps;
-  const autoRotateRef = useRef(autoRotate);
-  autoRotateRef.current = autoRotate;
 
   /* ------ Three.js Raycaster (reused across frames) ------ */
   const raycasterRef = useRef(new THREE.Raycaster());
@@ -341,7 +329,6 @@ function GlobeInner({
     const onResize = () => {
       if (resizeTimer) clearTimeout(resizeTimer);
       resizeTimer = setTimeout(() => {
-        forceRenderRef.current = true;
         setDimensions({ width: window.innerWidth, height: window.innerHeight });
       }, 120);
     };
@@ -425,10 +412,6 @@ function GlobeInner({
       const scene = globe.scene?.();
       
       if (renderer) {
-        if (origRenderRef.current) {
-          renderer.render = origRenderRef.current;
-          origRenderRef.current = null;
-        }
         renderer.setAnimationLoop?.(null);
       }
 
@@ -478,7 +461,7 @@ function GlobeInner({
   }, [rotationSpeed, autoRotate, paused]);
 
   /* ------ Freeze / resume the Three.js render loop (battery saver) ------ */
-  const wakeUntilRef = useRef(Date.now() + 1800);
+  const wakeUntilRef = useRef(Date.now() + 3500);
   const isAwakeRef = useRef(true);
   const [focusMarker, setFocusMarker] = useState<(CountryFocusTarget & { name: string }) | null>(null);
   const [ringBurstActive, setRingBurstActive] = useState(false);
@@ -487,19 +470,11 @@ function GlobeInner({
   const selectedCountryNameRef = useRef(selectedCountryName);
   selectedCountryNameRef.current = selectedCountryName;
 
-  const wakeGlobeFor = useCallback((holdMs = 1500, highPriority = false) => {
-    const now = Date.now();
-    const targetWakeUntil = now + holdMs;
+  const wakeGlobeFor = useCallback((holdMs = 1500, _highPriority = false) => {
+    const targetWakeUntil = Date.now() + holdMs;
     if (targetWakeUntil > wakeUntilRef.current) {
       wakeUntilRef.current = targetWakeUntil;
     }
-    if (highPriority) {
-      highFpsUntilRef.current = Math.max(
-        highFpsUntilRef.current,
-        performance.now() + holdMs
-      );
-    }
-    forceRenderRef.current = true;
     if (!isAwakeRef.current) {
       isAwakeRef.current = true;
       globeRef.current?.resumeAnimation();
@@ -507,15 +482,18 @@ function GlobeInner({
   }, []);
 
   const wakeGlobe = useCallback(() => {
-    wakeGlobeFor(1500, false);
+    wakeGlobeFor(1500);
+  }, [wakeGlobeFor]);
+
+  const handleGlobeReady = useCallback(() => {
+    wakeGlobeFor(1500);
   }, [wakeGlobeFor]);
 
   useEffect(() => {
-    forceRenderRef.current = true;
     if (!paused) {
-      wakeGlobeFor(700, false);
+      wakeGlobeFor(900);
     }
-  }, [paused, isNightMode, globeFps, wakeGlobeFor]);
+  }, [paused, isNightMode, globeFps, highQualityGraphics, dimensions, wakeGlobeFor]);
 
   useEffect(() => {
     return () => {
@@ -532,25 +510,6 @@ function GlobeInner({
 
     const renderer = globe.renderer?.();
     if (renderer) {
-      if (!origRenderRef.current) {
-        const origRender = renderer.render.bind(renderer) as THREE.WebGLRenderer["render"];
-        origRenderRef.current = origRender;
-        renderer.render = (scene: THREE.Object3D, camera: THREE.Camera) => {
-          const now = performance.now();
-          const targetFps = resolveTargetFps(
-            globeFpsRef.current,
-            now < highFpsUntilRef.current,
-            autoRotateRef.current
-          );
-          if (!shouldRenderFrame(now, lastRenderMsRef.current, targetFps, forceRenderRef.current)) {
-            return;
-          }
-          forceRenderRef.current = false;
-          lastRenderMsRef.current = now;
-          origRender(scene, camera);
-        };
-      }
-
       const targetPixelRatio = resolvePixelRatio(
         window.devicePixelRatio || 1,
         globeFps,
@@ -560,7 +519,7 @@ function GlobeInner({
         renderer.setPixelRatio(targetPixelRatio);
         const currentSize = renderer.getSize(new THREE.Vector2());
         renderer.setSize(currentSize.width, currentSize.height, false);
-        forceRenderRef.current = true;
+        wakeGlobeFor(800);
       }
 
       if (import.meta.env.DEV) {
@@ -570,7 +529,7 @@ function GlobeInner({
 
     const ctrl = globe.controls?.();
     const requestRender = () => {
-      wakeGlobeFor(1500, isPointerDraggingRef.current);
+      wakeGlobe();
     };
     const clearDrag = () => {
       isPointerDraggingRef.current = false;
@@ -1051,8 +1010,7 @@ function GlobeInner({
     if (isoMatches(feat.__isoA2, selectedCountryIso)) {
       return "rgba(56, 189, 248, 0.72)";
     }
-    // Omit side-skirt geometry for flat unselected polygons.
-    return "";
+    return "rgba(0, 255, 255, 0.04)";
   }, [selectedCountryIso]);
 
   const getPolygonStrokeColor = useCallback((feat: any) => {
@@ -1251,13 +1209,14 @@ function GlobeInner({
         globeImageUrl={isNightMode ? GLOBE_NIGHT_URL : GLOBE_DAY_URL}
         bumpImageUrl={undefined}
         /* ------ Scene ------ */
-        backgroundColor="#000000"
+        backgroundColor="rgba(0,0,0,0)"
         backgroundImageUrl={GLOBE_BACKGROUND_URL}
         enablePointerInteraction={!paused}
         showAtmosphere={false}
         atmosphereColor={isNightMode ? "#0066cc" : "#00bfff"}
         atmosphereAltitude={atmosphereIntensity}
         animateIn={false}
+        onGlobeReady={handleGlobeReady}
         /* ------ Country polygons ------ */
         polygonsData={countries}
         polygonCapColor={getPolygonCapColor}

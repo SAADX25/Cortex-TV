@@ -295,12 +295,12 @@ export default function SettingsPanel({
                 <div className="flex flex-col">
                   <span className="text-white text-base sm:text-sm font-semibold">Custom CORS Proxy</span>
                   <span className="text-blue-200/55 text-xs sm:text-[11px] leading-relaxed mt-1">
-                    Enter a proxy URL (e.g., https://corsproxy.io/?) if streams fail to load.
+                    Enter your Cloudflare Worker URL (e.g., https://your-worker.workers.dev/?url=) to play HTTP or CORS-blocked web streams.
                   </span>
                 </div>
                 <input
                   type="text"
-                  placeholder="https://corsproxy.io/?"
+                  placeholder="https://your-worker.workers.dev/?url="
                   value={settings.customProxyUrl || ""}
                   onChange={(e) => update({ customProxyUrl: e.target.value })}
                   className="w-full bg-[#081633] border border-blue-400/25 rounded-xl px-3 py-2.5 text-sm text-white placeholder-blue-200/35 focus:outline-none focus:border-sky-400 focus:ring-2 focus:ring-blue-500/25 transition-all"
