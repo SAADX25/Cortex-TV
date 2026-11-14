@@ -255,7 +255,7 @@ export default function HomeExperience({
               key={country.value}
               type="button"
               onClick={() => { onBrowseCountry(country); setSheet(null); }}
-              className="country-row group flex w-full items-center gap-3 rounded-xl border border-blue-400/[0.08] bg-[#0a1936]/55 px-3 py-2.5 text-left transition-all duration-150 hover:border-sky-400/45 hover:bg-gradient-to-r hover:from-blue-600/25 hover:to-sky-500/10 hover:shadow-[0_4px_18px_rgba(37,99,235,0.18)] focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 active:scale-[0.985]"
+              className="country-row group flex w-full items-center gap-3 rounded-xl border border-blue-400/[0.08] bg-[#0a1936]/55 px-3 py-2.5 text-left transition-colors duration-150 hover:border-sky-400/45 hover:bg-gradient-to-r hover:from-blue-600/25 hover:to-sky-500/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/50 active:scale-[0.985]"
             >
               <SafeImage
                 src={flagUrl(country.value, 40)}

@@ -282,6 +282,9 @@ export default function ChannelList({
   const filterOptions = useMemo(() => {
     const countryMap = new Map<string, { value: string; label: string; count: number }>();
     const languageMap = new Map<string, { value: string; label: string; count: number }>();
+    const categoryDefs = CATEGORY_DEFS.filter((definition) => definition.key !== "all");
+    const categoryCounts = new Map<string, number>();
+
     for (const channel of channels) {
       if (channel.country) {
         const item = countryMap.get(channel.country) ?? { value: channel.country, label: channel.countryName ?? countryName(channel.country), count: 0 };
@@ -294,13 +297,20 @@ export default function ChannelList({
         item.count += 1;
         languageMap.set(key, item);
       }
+      for (const definition of categoryDefs) {
+        if (matchesCategory(channel.categories, definition.key)) {
+          categoryCounts.set(definition.key, (categoryCounts.get(definition.key) ?? 0) + 1);
+        }
+      }
     }
 
-    const categories = CATEGORY_DEFS.map((definition) => ({
-      value: definition.key,
-      label: definition.label,
-      count: definition.key === "all" ? channels.length : channels.filter((channel) => matchesCategory(channel.categories, definition.key)).length,
-    })).filter((option) => option.value !== "all" && option.count > 0);
+    const categories = categoryDefs
+      .map((definition) => ({
+        value: definition.key,
+        label: definition.label,
+        count: categoryCounts.get(definition.key) ?? 0,
+      }))
+      .filter((option) => option.count > 0);
 
     return {
       countries: [...countryMap.values()].sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
@@ -355,7 +365,10 @@ export default function ChannelList({
   }, [favoriteIds, onPlayChannel, onToggleFavorite, playingChannelId]);
 
   const activeFilters = activeFilterCount(filters);
-  const liveCount = filtered.filter((channel) => channel.streamUrl).length;
+  const liveCount = useMemo(
+    () => filtered.reduce((acc, channel) => (channel.streamUrl ? acc + 1 : acc), 0),
+    [filtered],
+  );
   const hasFilters = activeFilters > 0 || !!search;
 
   const pillCategories = useMemo(() => {

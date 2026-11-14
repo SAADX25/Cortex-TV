@@ -12,7 +12,9 @@ interface SceneProps {
   rotationSpeed?: number;
   atmosphereIntensity?: number;
   focusCountryIso?: string | null;
+  focusTrigger?: number;
   selectedCountryIso?: string | null;
+  selectedCountryName?: string | null;
   globeFps?: GlobeFps;
   paused?: boolean;
   autoRotate?: boolean;
@@ -25,7 +27,9 @@ export default function Scene({
   rotationSpeed,
   atmosphereIntensity,
   focusCountryIso,
+  focusTrigger,
   selectedCountryIso,
+  selectedCountryName,
   globeFps,
   paused,
   autoRotate,
@@ -51,7 +55,9 @@ export default function Scene({
       rotationSpeed={rotationSpeed}
       atmosphereIntensity={atmosphereIntensity}
       focusCountryIso={focusCountryIso}
+      focusTrigger={focusTrigger}
       selectedCountryIso={selectedCountryIso}
+      selectedCountryName={selectedCountryName}
       globeFps={globeFps}
       paused={paused}
       autoRotate={autoRotate}

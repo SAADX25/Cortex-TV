@@ -10,7 +10,21 @@ import Crosshair from "./Crosshair";
 import SafeImage from "@/shared/components/SafeImage";
 import { flagUrl } from "@/shared/lib/channelUtils";
 import { COUNTRY_TZ, COUNTRY_CAPITAL, A3_TO_A2, ADMIN_TO_A2 } from "../data/geoData";
+import {
+  computeCountryFocusTarget,
+  computeFlightDurationMs,
+  findCountryFeature,
+  isoMatches,
+  normalizeGlobeIso,
+  type CountryFocusTarget,
+} from "../utils/countryFocus";
+import "../styles/countryPin.css";
 import { getCachedGeoJson, setCachedGeoJson } from "../data/geoJsonCache";
+import {
+  resolvePixelRatio,
+  resolveTargetFps,
+  shouldRenderFrame,
+} from "../utils/globePerf";
 
 /* ------ GeoJSON point-in-polygon (ray-casting) ------ */
 function pointInRing2D(
@@ -142,7 +156,7 @@ const CountryInfoBadge = memo(function CountryInfoBadge({
     }
     const tick = () => setLocalTime(getCountryTime(targetedCountry.iso));
     tick(); // immediate first render
-    const id = setInterval(tick, 1000);
+    const id = setInterval(tick, 15000);
     return () => clearInterval(id);
   }, [targetedCountry?.iso]);
 
@@ -210,16 +224,6 @@ const CountryInfoBadge = memo(function CountryInfoBadge({
   );
 });
 
-/** Convert ISO-A2 code to flag emoji (regional indicator symbols). */
-function isoToFlag(iso: string): string {
-  const code = iso.toUpperCase();
-  if (code.length !== 2) return '\u{1F30D}';
-  return String.fromCodePoint(
-    ...[...code].map(c => 0x1F1E6 + c.charCodeAt(0) - 65)
-  );
-}
-
-
 /** Detect if the primary input is touch (mobile/tablet). */
 const IS_TOUCH_DEVICE = typeof window !== 'undefined'
   && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
@@ -230,23 +234,11 @@ const GLOBE_DAY_URL =
   "https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg";
 const GLOBE_NIGHT_URL =
   "https://unpkg.com/three-globe/example/img/earth-night.jpg";
-const BUMP_IMAGE_URL =
-  "https://unpkg.com/three-globe/example/img/earth-topology.png";
 const GLOBE_BACKGROUND_URL =
-  "https://unpkg.com/three-globe/example/img/night-sky.png";
-const NIGHT_SKY_URL =
   "https://unpkg.com/three-globe/example/img/night-sky.png";
 const GEOJSON_URL =
   "https://cdn.jsdelivr.net/gh/vasturiano/react-globe.gl@master/example/datasets/ne_110m_admin_0_countries.geojson";
-// Auto-mode FPS target (matches previous GLOBE_TARGET_FPS of 20)
-const AUTO_GLOBE_TARGET_FPS = 20;
-const MAX_GLOBE_PIXEL_RATIO = 1;
 const MOBILE_TARGET_INTERVAL_MS = 250;
-const GLOBE_RENDERER_CONFIG = {
-  antialias: false,
-  alpha: true,
-  powerPreference: "low-power" as WebGLPowerPreference,
-};
 
 /* Detect prefers-reduced-motion */
 const PREFERS_REDUCED_MOTION =
@@ -271,8 +263,10 @@ interface GlobeProps {
   rotationSpeed?: number;
   atmosphereIntensity?: number;
   focusCountryIso?: string | null;
-  /** ISO-A2 code of the currently selected country - highlighted in red */
+  focusTrigger?: number;
+  /** ISO-A2 code of the currently selected country - highlighted in royal blue */
   selectedCountryIso?: string | null;
+  selectedCountryName?: string | null;
   /** Globe FPS cap: "auto" uses quality-based logic, 30 or 60 caps render loop */
   globeFps?: GlobeFps;
   /** Pause auto-rotation and heavy renders (search open, video playing) */
@@ -290,7 +284,9 @@ function GlobeInner({
   atmosphereIntensity = 0.25,
   globeFps = "auto",
   focusCountryIso,
+  focusTrigger,
   selectedCountryIso,
+  selectedCountryName,
   paused = false,
   autoRotate = false,
   highQualityGraphics = false,
@@ -306,7 +302,7 @@ function GlobeInner({
 
   const rendererConfig = useMemo(() => ({
     antialias: highQualityGraphics,
-    alpha: true,
+    alpha: false,
     powerPreference: (highQualityGraphics ? "high-performance" : "low-power") as WebGLPowerPreference,
   }), [highQualityGraphics]);
   /* ------ Sniper-mode state ------ */
@@ -322,20 +318,38 @@ function GlobeInner({
   /* ------ Language toggle state ------ */
   const [uiLang, setUiLang] = useState<"en" | "ar">("en");
 
-  const renderRequestedRef = useRef(false);
-  const animationEndTimeRef = useRef(performance.now() + 2000);
+  const forceRenderRef = useRef(true);
+  const lastRenderMsRef = useRef(0);
+  const highFpsUntilRef = useRef(performance.now() + 1800);
+  const isPointerDraggingRef = useRef(false);
+  const lastHoverCheckMsRef = useRef(0);
+  const origRenderRef = useRef<THREE.WebGLRenderer["render"] | null>(null);
+  const globeFpsRef = useRef(globeFps);
+  globeFpsRef.current = globeFps;
+  const autoRotateRef = useRef(autoRotate);
+  autoRotateRef.current = autoRotate;
 
   /* ------ Three.js Raycaster (reused across frames) ------ */
   const raycasterRef = useRef(new THREE.Raycaster());
   const centerNDC = useRef(new THREE.Vector2(0, 0));
+  const hoverNdcRef = useRef(new THREE.Vector2(0, 0));
   const rafIdRef = useRef(0);
 
-  /* ------ Responsive resize ------ */
+  /* ------ Responsive resize (debounced to avoid WebGL target churn while dragging edges) ------ */
   useEffect(() => {
-    const onResize = () =>
-      setDimensions({ width: window.innerWidth, height: window.innerHeight });
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    const onResize = () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        forceRenderRef.current = true;
+        setDimensions({ width: window.innerWidth, height: window.innerHeight });
+      }, 120);
+    };
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () => {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      window.removeEventListener("resize", onResize);
+    };
   }, []);
 
   /* ------ Fetch country polygons ------ */
@@ -411,27 +425,32 @@ function GlobeInner({
       const scene = globe.scene?.();
       
       if (renderer) {
+        if (origRenderRef.current) {
+          renderer.render = origRenderRef.current;
+          origRenderRef.current = null;
+        }
         renderer.setAnimationLoop?.(null);
       }
-      
+
+      const disposeMaterial = (mat: any) => {
+        if (!mat) return;
+        mat.map?.dispose?.();
+        mat.lightMap?.dispose?.();
+        mat.bumpMap?.dispose?.();
+        mat.normalMap?.dispose?.();
+        mat.specularMap?.dispose?.();
+        mat.envMap?.dispose?.();
+        mat.dispose?.();
+      };
+
       if (scene) {
         scene.traverse((object: any) => {
-          if (object.geometry) {
-            object.geometry.dispose();
+          object.geometry?.dispose?.();
+          if (Array.isArray(object.material)) {
+            object.material.forEach(disposeMaterial);
+          } else {
+            disposeMaterial(object.material);
           }
-          if (object.material) {
-            if (Array.isArray(object.material)) {
-              object.material.forEach((m: any) => m.dispose());
-            } else {
-              object.material.dispose();
-            }
-          }
-          if (object.material?.map) object.material.map.dispose();
-          if (object.material?.lightMap) object.material.lightMap.dispose();
-          if (object.material?.bumpMap) object.material.bumpMap.dispose();
-          if (object.material?.normalMap) object.material.normalMap.dispose();
-          if (object.material?.specularMap) object.material.specularMap.dispose();
-          if (object.material?.envMap) object.material.envMap.dispose();
         });
       }
 
@@ -459,48 +478,110 @@ function GlobeInner({
   }, [rotationSpeed, autoRotate, paused]);
 
   /* ------ Freeze / resume the Three.js render loop (battery saver) ------ */
-  const lastWakeTimeRef = useRef(Date.now());
+  const wakeUntilRef = useRef(Date.now() + 1800);
   const isAwakeRef = useRef(true);
+  const [focusMarker, setFocusMarker] = useState<(CountryFocusTarget & { name: string }) | null>(null);
+  const [ringBurstActive, setRingBurstActive] = useState(false);
+  const lastExecutedFocusRef = useRef<string | null>(null);
+  const ringTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const selectedCountryNameRef = useRef(selectedCountryName);
+  selectedCountryNameRef.current = selectedCountryName;
 
-  const wakeGlobe = useCallback(() => {
-    lastWakeTimeRef.current = Date.now();
+  const wakeGlobeFor = useCallback((holdMs = 1500, highPriority = false) => {
+    const now = Date.now();
+    const targetWakeUntil = now + holdMs;
+    if (targetWakeUntil > wakeUntilRef.current) {
+      wakeUntilRef.current = targetWakeUntil;
+    }
+    if (highPriority) {
+      highFpsUntilRef.current = Math.max(
+        highFpsUntilRef.current,
+        performance.now() + holdMs
+      );
+    }
+    forceRenderRef.current = true;
     if (!isAwakeRef.current) {
       isAwakeRef.current = true;
       globeRef.current?.resumeAnimation();
     }
   }, []);
 
+  const wakeGlobe = useCallback(() => {
+    wakeGlobeFor(1500, false);
+  }, [wakeGlobeFor]);
+
+  useEffect(() => {
+    forceRenderRef.current = true;
+    if (!paused) {
+      wakeGlobeFor(700, false);
+    }
+  }, [paused, isNightMode, globeFps, wakeGlobeFor]);
+
+  useEffect(() => {
+    return () => {
+      if (ringTimeoutRef.current) {
+        clearTimeout(ringTimeoutRef.current);
+        ringTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
-    
-    // Auto mode tweaks for performance
+
     const renderer = globe.renderer?.();
     if (renderer) {
-      const isAuto = globeFps === "auto";
-      const targetPixelRatio = highQualityGraphics
-        ? Math.min(window.devicePixelRatio || 1, 3) 
-        : isAuto 
-          ? Math.min(window.devicePixelRatio || 1, 0.75) 
-          : Math.min(window.devicePixelRatio || 1, MAX_GLOBE_PIXEL_RATIO);
-      renderer.setPixelRatio(targetPixelRatio);
-      const currentSize = renderer.getSize(new THREE.Vector2());
-      renderer.setSize(currentSize.width, currentSize.height, false);
-      
+      if (!origRenderRef.current) {
+        const origRender = renderer.render.bind(renderer) as THREE.WebGLRenderer["render"];
+        origRenderRef.current = origRender;
+        renderer.render = (scene: THREE.Object3D, camera: THREE.Camera) => {
+          const now = performance.now();
+          const targetFps = resolveTargetFps(
+            globeFpsRef.current,
+            now < highFpsUntilRef.current,
+            autoRotateRef.current
+          );
+          if (!shouldRenderFrame(now, lastRenderMsRef.current, targetFps, forceRenderRef.current)) {
+            return;
+          }
+          forceRenderRef.current = false;
+          lastRenderMsRef.current = now;
+          origRender(scene, camera);
+        };
+      }
+
+      const targetPixelRatio = resolvePixelRatio(
+        window.devicePixelRatio || 1,
+        globeFps,
+        highQualityGraphics
+      );
+      if (renderer.getPixelRatio() !== targetPixelRatio) {
+        renderer.setPixelRatio(targetPixelRatio);
+        const currentSize = renderer.getSize(new THREE.Vector2());
+        renderer.setSize(currentSize.width, currentSize.height, false);
+        forceRenderRef.current = true;
+      }
+
       if (import.meta.env.DEV) {
         (window as any).__cortexGlobeRendererInfo = renderer.info.memory;
       }
     }
 
     const ctrl = globe.controls?.();
-    const requestRender = () => { 
-      wakeGlobe(); 
+    const requestRender = () => {
+      wakeGlobeFor(1500, isPointerDraggingRef.current);
+    };
+    const clearDrag = () => {
+      isPointerDraggingRef.current = false;
     };
     if (ctrl) {
       ctrl.addEventListener("change", requestRender);
     }
+    window.addEventListener("pointerup", clearDrag);
+    window.addEventListener("pointercancel", clearDrag);
 
-    // Timer to put the globe to sleep when idle to save CPU
+    // Timer to put the globe to sleep when idle to save CPU/GPU
     const interval = setInterval(() => {
       if (paused) {
         if (isAwakeRef.current) {
@@ -515,8 +596,7 @@ function GlobeInner({
         return;
       }
 
-      const idleTime = Date.now() - lastWakeTimeRef.current;
-      if (idleTime > 1500 && isAwakeRef.current) {
+      if (Date.now() >= wakeUntilRef.current && isAwakeRef.current) {
         isAwakeRef.current = false;
         globe?.pauseAnimation();
       }
@@ -526,55 +606,127 @@ function GlobeInner({
     return () => {
       clearInterval(interval);
       if (ctrl) ctrl.removeEventListener("change", requestRender);
+      window.removeEventListener("pointerup", clearDrag);
+      window.removeEventListener("pointercancel", clearDrag);
     };
-  }, [paused, highQualityGraphics, globeFps, autoRotate, rotationSpeed, wakeGlobe]);
+  }, [paused, highQualityGraphics, globeFps, autoRotate, rotationSpeed, wakeGlobe, wakeGlobeFor]);
 
-  /* ------ Fly to country when focusCountryIso changes ------ */
+  /* ------ Keep selected country locator marker synced ------ */
   useEffect(() => {
-    if (!focusCountryIso || !globeRef.current || countries.length === 0) return;
-    const iso = focusCountryIso.toUpperCase();
-    const feature = countries.find((f: any) => {
-      if (f.__isoA2) return f.__isoA2.toUpperCase() === iso;
-      const p = f.properties ?? {};
-      return (
-        (p.ISO_A2 ?? "").toUpperCase() === iso ||
-        (p.ISO_A3 ?? "").toUpperCase() === iso ||
-        (p.ADM0_A3 ?? "").toUpperCase() === iso
-      );
-    });
+    if (!selectedCountryIso || countries.length === 0) {
+      setFocusMarker(null);
+      setRingBurstActive(false);
+      return;
+    }
+
+    const feature = findCountryFeature(countries, selectedCountryIso);
+    if (!feature) {
+      setFocusMarker(null);
+      return;
+    }
+
+    const target = computeCountryFocusTarget(feature, selectedCountryIso);
+    if (!target) {
+      setFocusMarker(null);
+      return;
+    }
+
+    const resolvedName =
+      selectedCountryName ||
+      feature.properties?.NAME ||
+      feature.properties?.ADMIN ||
+      feature.properties?.name ||
+      target.iso;
+
+    setFocusMarker((prev) =>
+      prev &&
+      prev.iso === target.iso &&
+      prev.name === resolvedName &&
+      Math.abs(prev.lat - target.lat) < 0.01 &&
+      Math.abs(prev.lng - target.lng) < 0.01
+        ? prev
+        : { ...target, name: resolvedName }
+    );
+  }, [selectedCountryIso, selectedCountryName, countries]);
+
+  /* ------ Fly to country + sonar lock-on when focusCountryIso changes ------ */
+  useEffect(() => {
+    if (!focusCountryIso) {
+      lastExecutedFocusRef.current = null;
+      if (ringTimeoutRef.current) {
+        clearTimeout(ringTimeoutRef.current);
+        ringTimeoutRef.current = null;
+      }
+      setRingBurstActive(false);
+      return;
+    }
+    if (paused || !globeRef.current || countries.length === 0) return;
+
+    const normIso = normalizeGlobeIso(focusCountryIso);
+    const focusKey = `${focusTrigger ?? 0}:${normIso}`;
+    if (lastExecutedFocusRef.current === focusKey) return;
+
+    const feature = findCountryFeature(countries, focusCountryIso);
     if (!feature) return;
 
-    /* Compute centroid from the geometry coordinates */
-    const coords = feature.geometry?.coordinates;
-    if (!coords) return;
-    let lats = 0, lngs = 0, count = 0;
-    const flatten = (arr: any) => {
-      if (typeof arr[0] === "number") {
-        lngs += arr[0];
-        lats += arr[1];
-        count++;
-      } else {
-        for (const sub of arr) flatten(sub);
-      }
-    };
-    flatten(coords);
-    if (count === 0) return;
+    const target = computeCountryFocusTarget(feature, focusCountryIso);
+    if (!target) return;
 
-    globeRef.current.pointOfView(
-      { lat: lats / count, lng: lngs / count, altitude: 1.8 },
-      1200
+    lastExecutedFocusRef.current = focusKey;
+
+    const globe = globeRef.current;
+    const currentPov = typeof globe.pointOfView === "function" ? globe.pointOfView() : undefined;
+    const durationMs = computeFlightDurationMs(
+      currentPov?.lat,
+      currentPov?.lng,
+      target.lat,
+      target.lng,
+      PREFERS_REDUCED_MOTION
     );
-    animationEndTimeRef.current = performance.now() + 1250;
-  }, [focusCountryIso, countries]);
+
+    const pulseDurationMs = PREFERS_REDUCED_MOTION ? 0 : 3400;
+    const holdAwakeMs = durationMs + pulseDurationMs + 450;
+
+    // Wake WebGL at 60fps before starting pointOfView tween so fly-to stays smooth even in Smart mode.
+    wakeGlobeFor(holdAwakeMs, true);
+
+    const resolvedName =
+      selectedCountryNameRef.current ||
+      feature.properties?.NAME ||
+      feature.properties?.ADMIN ||
+      feature.properties?.name ||
+      target.iso;
+    setFocusMarker({ ...target, name: resolvedName });
+
+    if (ringTimeoutRef.current) {
+      clearTimeout(ringTimeoutRef.current);
+      ringTimeoutRef.current = null;
+    }
+
+    if (!PREFERS_REDUCED_MOTION) {
+      setRingBurstActive(true);
+      ringTimeoutRef.current = setTimeout(() => {
+        setRingBurstActive(false);
+        ringTimeoutRef.current = null;
+      }, durationMs + pulseDurationMs);
+    } else {
+      setRingBurstActive(false);
+    }
+
+    globe.pointOfView(
+      { lat: target.lat, lng: target.lng, altitude: target.altitude },
+      durationMs
+    );
+  }, [focusCountryIso, focusTrigger, countries, paused, wakeGlobeFor]);
 
   /* ------ Render Triggers for transitions ------ */
   useEffect(() => {
-    animationEndTimeRef.current = performance.now() + 1000;
-  }, [countries]);
+    wakeGlobeFor(1000);
+  }, [countries, wakeGlobeFor]);
 
   useEffect(() => {
-    animationEndTimeRef.current = performance.now() + 350;
-  }, [selectedCountryIso]);
+    wakeGlobeFor(550);
+  }, [selectedCountryIso, wakeGlobeFor]);
 
   /* ------ Helper: extract name + iso from a GeoJSON feature ------ */
   const extractCountryInfo = useCallback((feature: any) => {
@@ -623,13 +775,13 @@ function GlobeInner({
      Accurate regardless of camera tilt, zoom, or orbit offset.
      Uses the three-globe coordinate convention (Y-up). */
   const GLOBE_RADIUS = 100; // three-globe default
-  const surfaceLatLngAtCenter = useCallback((): { lat: number; lng: number } | null => {
+  const surfaceLatLngAtNDC = useCallback((ndc: THREE.Vector2): { lat: number; lng: number } | null => {
     const globe = globeRef.current;
     if (!globe) return null;
     const camera = globe.camera();
     if (!camera) return null;
 
-    raycasterRef.current.setFromCamera(centerNDC.current, camera);
+    raycasterRef.current.setFromCamera(ndc, camera);
     const { origin, direction } = raycasterRef.current.ray;
 
     /* Analytical ray-sphere intersection (sphere at origin, radius R).
@@ -662,6 +814,11 @@ function GlobeInner({
     return { lat, lng };
   }, []);
 
+  const surfaceLatLngAtCenter = useCallback(
+    () => surfaceLatLngAtNDC(centerNDC.current),
+    [surfaceLatLngAtNDC]
+  );
+
   /* ------ Fallback: raycaster --- polygon mesh __data at exact screen center ------ */
   const getCenterCountry = useCallback((): any | null => {
     const globe = globeRef.current;
@@ -690,6 +847,14 @@ function GlobeInner({
     return null;
   }, []);
 
+  const findCountryAtGeo = useCallback((lng: number, lat: number): any | null => {
+    for (const { feature, minLng, maxLng, minLat, maxLat } of countryBBoxes) {
+      if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
+      if (geoContainsPoint(feature, lng, lat)) return feature;
+    }
+    return null;
+  }, [countryBBoxes]);
+
   /* ------ Primary: raycast to globe surface --- lat/lng --- PIP ------ */
   const getCenterCountryGeo = useCallback((): any | null => {
     if (countryBBoxes.length === 0) return null;
@@ -697,15 +862,8 @@ function GlobeInner({
     /* Get the exact lat/lng of the surface point under the crosshair */
     const geo = surfaceLatLngAtCenter();
     if (!geo) return null;
-    const { lat, lng } = geo;
-
-    // Fast bbox pre-filter, then precise point-in-polygon
-    for (const { feature, minLng, maxLng, minLat, maxLat } of countryBBoxes) {
-      if (lng < minLng || lng > maxLng || lat < minLat || lat > maxLat) continue;
-      if (geoContainsPoint(feature, lng, lat)) return feature;
-    }
-    return null;
-  }, [countryBBoxes, surfaceLatLngAtCenter]);
+    return findCountryAtGeo(geo.lng, geo.lat);
+  }, [countryBBoxes.length, surfaceLatLngAtCenter, findCountryAtGeo]);
 
   /* ------ Combined center lookup (geo-precise first, raycaster fallback) ------ */
   const getCenterCountryCombined = useCallback((): any | null => {
@@ -790,15 +948,18 @@ function GlobeInner({
     if ((e.target as HTMLElement).closest?.("button")) return;
     if ((e.target as HTMLElement).tagName !== "CANVAS") return;
 
+    isPointerDraggingRef.current = true;
+    wakeGlobeFor(1500, true);
     pointerDownRef.current = {
       x: e.clientX,
       y: e.clientY,
       time: Date.now(),
     };
-  }, []);
+  }, [wakeGlobeFor]);
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
+      isPointerDraggingRef.current = false;
       /* Ignore taps on UI overlays */
       if ((e.target as HTMLElement).closest?.("button")) return;
       if ((e.target as HTMLElement).tagName !== "CANVAS") return;
@@ -820,6 +981,36 @@ function GlobeInner({
       }
     },
     [selectCountryAtCenter]
+  );
+
+  /* Hover lookup on resting globe stays analytical on CPU so cursor movement never wakes WebGL. */
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (paused) return;
+      if (isPointerDraggingRef.current || e.buttons > 0) {
+        wakeGlobeFor(1500, true);
+        return;
+      }
+      if (IS_TOUCH_DEVICE || isAwakeRef.current) return;
+      if ((e.target as HTMLElement).tagName !== "CANVAS") return;
+
+      const now = performance.now();
+      if (now - lastHoverCheckMsRef.current < 85) return;
+      lastHoverCheckMsRef.current = now;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
+      hoverNdcRef.current.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1
+      );
+      const geo = surfaceLatLngAtNDC(hoverNdcRef.current);
+      const feature = geo ? findCountryAtGeo(geo.lng, geo.lat) : null;
+      const info = feature ? extractCountryInfo(feature) : null;
+      setTargetedCountry((prev) => (prev?.iso === info?.iso ? prev : info ?? null));
+    },
+    [paused, wakeGlobeFor, surfaceLatLngAtNDC, findCountryAtGeo, extractCountryInfo]
   );
 
   /* ------ Direct mouse click on polygon (PC/Desktop) ------ */
@@ -850,51 +1041,142 @@ function GlobeInner({
 
   /* ------ Memoized Accessors for react-globe.gl ------ */
   const getPolygonCapColor = useCallback((feat: any) => {
-    if (paused) return "rgba(0,0,0,0)";
-    const iso = feat.__isoA2;
-    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-      return "rgba(255, 40, 40, 0.45)";
+    if (isoMatches(feat.__isoA2, selectedCountryIso)) {
+      return "rgba(37, 99, 235, 0.42)";
     }
     return "rgba(0, 255, 255, 0.02)";
-  }, [paused, selectedCountryIso]);
+  }, [selectedCountryIso]);
 
   const getPolygonSideColor = useCallback((feat: any) => {
-    if (paused) return "rgba(0,0,0,0)";
-    const iso = feat.__isoA2;
-    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-      return "rgba(255, 40, 40, 0.6)";
+    if (isoMatches(feat.__isoA2, selectedCountryIso)) {
+      return "rgba(56, 189, 248, 0.72)";
     }
-    return "rgba(0, 255, 255, 0.05)";
-  }, [paused, selectedCountryIso]);
+    // Omit side-skirt geometry for flat unselected polygons.
+    return "";
+  }, [selectedCountryIso]);
 
   const getPolygonStrokeColor = useCallback((feat: any) => {
-    if (paused) return "rgba(0,0,0,0)";
-    const iso = feat.__isoA2;
-    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-      return "#ff2828";
+    if (isoMatches(feat.__isoA2, selectedCountryIso)) {
+      return "#7dd3fc";
     }
-    return "#00ffff";
-  }, [paused, selectedCountryIso]);
+    return selectedCountryIso ? "rgba(34, 211, 238, 0.45)" : "#00ffff";
+  }, [selectedCountryIso]);
 
   const getPolygonAltitude = useCallback((feat: any) => {
-    const iso = feat.__isoA2;
-    if (selectedCountryIso && iso && iso.toUpperCase() === selectedCountryIso.toUpperCase()) {
-      return 0.018;
+    if (isoMatches(feat.__isoA2, selectedCountryIso)) {
+      return 0.028;
     }
     return 0.005;
   }, [selectedCountryIso]);
 
   const getPolygonLabel = useCallback(() => "", []);
 
+  const focusPinPoints = useMemo(
+    () => (focusMarker && !paused ? [focusMarker] : []),
+    [focusMarker, paused]
+  );
+
+  const focusRings = useMemo(() => {
+    if (!focusMarker || !ringBurstActive || paused) return [];
+    return [
+      {
+        lat: focusMarker.lat,
+        lng: focusMarker.lng,
+        maxRadius: focusMarker.ringRadius,
+        speed: 3.4,
+        period: 1050,
+        rgb: "56, 189, 248",
+      },
+      {
+        lat: focusMarker.lat,
+        lng: focusMarker.lng,
+        maxRadius: focusMarker.ringRadius * 0.58,
+        speed: 2.3,
+        period: 900,
+        rgb: "96, 165, 250",
+      },
+    ];
+  }, [focusMarker, ringBurstActive, paused]);
+
+  const getPointColor = useCallback(() => "#38bdf8", []);
+  const getRingColor = useCallback(
+    (r: any) => (t: number) => `rgba(${r.rgb}, ${Math.max(0, 1 - t).toFixed(3)})`,
+    []
+  );
+  const getRingMaxRadius = useCallback((r: any) => r.maxRadius, []);
+  const getRingSpeed = useCallback((r: any) => r.speed, []);
+  const getRingPeriod = useCallback((r: any) => r.period, []);
+
+  const buildPinElement = useCallback((d: any) => {
+    const root = document.createElement("div");
+    root.className = "cortex-globe-pin";
+    root.style.pointerEvents = "none";
+
+    const callout = document.createElement("div");
+    callout.className = "cortex-globe-pin-callout";
+
+    const badge = document.createElement("div");
+    badge.className = "cortex-globe-pin-badge";
+
+    const isoSpan = document.createElement("span");
+    isoSpan.className = "cortex-globe-pin-iso";
+    isoSpan.textContent = d.iso || "";
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "cortex-globe-pin-name";
+    nameSpan.textContent = d.name || d.iso || "";
+
+    badge.appendChild(isoSpan);
+    badge.appendChild(nameSpan);
+
+    const stem = document.createElement("div");
+    stem.className = "cortex-globe-pin-stem";
+
+    callout.appendChild(badge);
+    callout.appendChild(stem);
+
+    const reticle = document.createElement("div");
+    reticle.className = "cortex-globe-pin-reticle";
+
+    const pulse = document.createElement("div");
+    pulse.className = "cortex-globe-pin-pulse";
+
+    const ring = document.createElement("div");
+    ring.className = "cortex-globe-pin-ring";
+
+    const core = document.createElement("div");
+    core.className = "cortex-globe-pin-core";
+
+    reticle.appendChild(pulse);
+    reticle.appendChild(ring);
+    reticle.appendChild(core);
+
+    root.appendChild(callout);
+    root.appendChild(reticle);
+    return root;
+  }, []);
+
+  const handleWheel = useCallback(() => {
+    wakeGlobeFor(1500, true);
+  }, [wakeGlobeFor]);
+
+  const handlePointerLeave = useCallback(() => {
+    isPointerDraggingRef.current = false;
+    if (!IS_TOUCH_DEVICE) {
+      setTargetedCountry((prev) => (prev !== null ? null : prev));
+    }
+  }, []);
+
   return (
     <div
       ref={containerRef}
       className="w-full h-full"
       style={{ touchAction: "none" }}
-      onPointerDown={(e) => { wakeGlobe(); handlePointerDown(e); }}
+      onPointerDown={handlePointerDown}
       onPointerUp={handlePointerUp}
-      onPointerMove={wakeGlobe}
-      onWheel={wakeGlobe}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={handlePointerLeave}
+      onWheel={handleWheel}
     >
       {/* ------ Language toggle button (top-left, mirrors Dark-Mode on the right) ------ */}
       <button
@@ -955,7 +1237,7 @@ function GlobeInner({
               textShadow: "0 0 12px rgba(0,255,255,0.8)",
             }}
           >
-            Loading Globeâ€¦
+            Loading Globe…
           </span>
         </div>
       )}
@@ -969,7 +1251,7 @@ function GlobeInner({
         globeImageUrl={isNightMode ? GLOBE_NIGHT_URL : GLOBE_DAY_URL}
         bumpImageUrl={undefined}
         /* ------ Scene ------ */
-        backgroundColor="rgba(0,0,0,0)"
+        backgroundColor="#000000"
         backgroundImageUrl={GLOBE_BACKGROUND_URL}
         enablePointerInteraction={!paused}
         showAtmosphere={false}
@@ -982,13 +1264,34 @@ function GlobeInner({
         polygonSideColor={getPolygonSideColor}
         polygonStrokeColor={getPolygonStrokeColor}
         polygonAltitude={getPolygonAltitude}
-        polygonCapCurvatureResolution={1}
+        polygonCapCurvatureResolution={highQualityGraphics ? 3 : 5}
         polygonLabel={getPolygonLabel}
+        /* ------ Selected country pinpoint & radar lock-on ------ */
+        pointsData={focusPinPoints}
+        pointLat="lat"
+        pointLng="lng"
+        pointColor={getPointColor}
+        pointAltitude={0.085}
+        pointRadius={0.28}
+        pointsTransitionDuration={450}
+        ringsData={focusRings}
+        ringLat="lat"
+        ringLng="lng"
+        ringAltitude={0.032}
+        ringColor={getRingColor}
+        ringMaxRadius={getRingMaxRadius}
+        ringPropagationSpeed={getRingSpeed}
+        ringRepeatPeriod={getRingPeriod}
+        htmlElementsData={focusPinPoints}
+        htmlLat="lat"
+        htmlLng="lng"
+        htmlAltitude={0.035}
+        htmlElement={buildPinElement}
         /* Interaction */
         onPolygonHover={handlePolygonHover}
         onPolygonClick={handlePolygonClick}
         /* Performance */
-        polygonsTransitionDuration={300}
+        polygonsTransitionDuration={450}
       />
     </div>
   );

@@ -46,6 +46,7 @@ export default function AppLayout() {
   const activeTab = useUIStore((s) => s.activeTab);
   const selectedCountry = useUIStore((s) => s.selectedCountry);
   const focusCountryIso = useUIStore((s) => s.focusCountryIso);
+  const focusNonce = useUIStore((s) => s.focusNonce);
   const isNightMode = useUIStore((s) => s.isNightMode);
   const globeSettings = useUIStore((s) => s.globeSettings);
   const splashVisible = useUIStore((s) => s.splashVisible);
@@ -178,6 +179,7 @@ export default function AppLayout() {
   const handleCountryClick = (info: GlobeClickInfo) => {
     if (info.country) {
       selectCountry(info.country);
+      setFocusCountryIso(info.country.iso);
       closePlayer();
     }
   };
@@ -341,10 +343,12 @@ export default function AppLayout() {
           rotationSpeed={globeSettings.rotationSpeed}
           atmosphereIntensity={globeSettings.atmosphereIntensity}
           focusCountryIso={focusCountryIso}
+          focusTrigger={focusNonce}
           selectedCountryIso={selectedCountry?.iso ?? null}
+          selectedCountryName={selectedCountry?.name ?? null}
           globeFps={globeSettings.globeFps}
           paused={!sceneVisible}
-          autoRotate={globeSettings.autoRotate}
+          autoRotate={globeSettings.autoRotate && !selectedCountry}
           highQualityGraphics={globeSettings.highQualityGraphics}
         />
       </div>

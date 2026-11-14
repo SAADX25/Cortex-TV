@@ -44,6 +44,7 @@ interface UIState {
   activeTab: ActiveTab;
   selectedCountry: CountryInfo | null;
   focusCountryIso: string | null;
+  focusNonce: number;
   isNightMode: boolean;
   globeSettings: GlobeSettings;
   splashVisible: boolean;
@@ -70,14 +71,23 @@ export const useUIStore = create<UIState>((set) => ({
   activeTab: "globe",
   selectedCountry: null,
   focusCountryIso: null,
+  focusNonce: 0,
   isNightMode: false,
   globeSettings: loadSettings(),
   splashVisible: true,
   splashFading: false,
 
   setActiveTab: (tab) => set({ activeTab: tab }),
-  selectCountry: (country) => set({ selectedCountry: country }),
-  setFocusCountryIso: (iso) => set({ focusCountryIso: iso }),
+  selectCountry: (country) =>
+    set((state) => ({
+      selectedCountry: country,
+      focusCountryIso: country ? state.focusCountryIso : null,
+    })),
+  setFocusCountryIso: (iso) =>
+    set((state) => ({
+      focusCountryIso: iso,
+      focusNonce: iso ? state.focusNonce + 1 : state.focusNonce,
+    })),
   toggleNightMode: () => set((s) => ({ isNightMode: !s.isNightMode })),
   setNightMode: (v) => set({ isNightMode: v }),
   setSplashFading: (v) => set({ splashFading: v }),
@@ -90,6 +100,6 @@ export const useUIStore = create<UIState>((set) => ({
 
   navigateTo: (tab) => {
     usePlayerStore.getState().close();
-    set({ activeTab: tab, selectedCountry: null });
+    set({ activeTab: tab, selectedCountry: null, focusCountryIso: null });
   },
 }));
