@@ -1,5 +1,22 @@
-import { app, BrowserWindow, Menu, screen, session } from "electron";
+import { app, BrowserWindow, Menu, net, protocol, screen, session } from "electron";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
+
+const APP_SCHEME = "app";
+const APP_ORIGIN = `${APP_SCHEME}://cortex-tv`;
+
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: APP_SCHEME,
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
+]);
 
 process.env.DIST = path.join(__dirname, "../dist");
 process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(process.env.DIST, "../public");
@@ -8,11 +25,29 @@ const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const IS_DEV = !app.isPackaged;
 const CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
+function setupAppProtocol() {
+  const distRoot = path.resolve(process.env.DIST!);
+  protocol.handle(APP_SCHEME, (request) => {
+    try {
+      const url = new URL(request.url);
+      const rawPath = decodeURIComponent(url.pathname).replace(/^\/+/, "");
+      const relPath = rawPath || "index.html";
+      const targetPath = path.resolve(distRoot, relPath);
+      if (targetPath !== distRoot && !targetPath.startsWith(distRoot + path.sep)) {
+        return new Response("Forbidden", { status: 403 });
+      }
+      return net.fetch(pathToFileURL(targetPath).toString());
+    } catch {
+      return new Response("Bad Request", { status: 400 });
+    }
+  });
+}
+
 function createWindow() {
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
   mainWindow = new BrowserWindow({
     width: Math.min(1500, width), height: Math.min(940, height), minWidth: 900, minHeight: 600,
-    title: "Cortex TV", icon: path.join(process.env.VITE_PUBLIC!, "favicon.svg"),
+    title: "Cortex TV", icon: path.join(process.env.VITE_PUBLIC!, "icon.ico"),
     backgroundColor: "#08080a", show: false,
     webPreferences: {
       nodeIntegration: false, contextIsolation: true, webgl: true,
@@ -32,7 +67,7 @@ function createWindow() {
     try {
       if (VITE_DEV_SERVER_URL) await mainWindow!.loadURL(VITE_DEV_SERVER_URL);
       else if (IS_DEV) await mainWindow!.loadURL("http://localhost:5173");
-      else await mainWindow!.loadFile(path.join(process.env.DIST!, "index.html"));
+      else await mainWindow!.loadURL(`${APP_ORIGIN}/index.html`);
     } catch (error) { console.error("[Electron] Failed to load app:", error); }
   };
   void load();
@@ -80,6 +115,26 @@ function setupWebRequestInterceptor() {
   });
 }
 
-app.whenReady().then(() => { Menu.setApplicationMenu(null); setupWebRequestInterceptor(); createWindow(); });
+if (process.platform === "win32") {
+  app.setAppUserModelId("com.cortextv.app");
+}
+
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+  app.whenReady().then(() => {
+    Menu.setApplicationMenu(null);
+    setupAppProtocol();
+    setupWebRequestInterceptor();
+    createWindow();
+  });
+}
 app.on("window-all-closed", () => { if (process.platform !== "darwin") { app.quit(); mainWindow = null; } });
 app.on("activate", () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });
